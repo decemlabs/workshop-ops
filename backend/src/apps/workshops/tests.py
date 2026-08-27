@@ -1,4 +1,5 @@
 import pytest
+from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
 from rest_framework.test import APIClient
 
@@ -111,7 +112,51 @@ def test_api_allows_editing_task_of_deactivated_worker(api, worker):
     worker.is_active = False
     worker.save()
 
-    response = api.patch(f'/api/tasks/{task.pk}/', {'completed': True})
+    response = api.patch(f'/api/tasks/{task.pk}/', {'status': Task.Status.DONE})
 
     assert response.status_code == 200
-    assert response.json()['completed'] is True
+    assert response.json()['status'] == 'done'
+
+
+def test_task_status_defaults_to_new(worker):
+    assert Task.objects.create(title='Собрать раму', worker=worker).status == Task.Status.NEW
+
+
+def test_timestamps_are_filled_and_updated(worker):
+    task = Task.objects.create(title='Собрать раму', worker=worker)
+    created, updated = task.created_at, task.updated_at
+
+    task.status = Task.Status.DONE
+    task.save()
+    task.refresh_from_db()
+
+    assert task.created_at == created
+    assert task.updated_at > updated
+
+
+def test_clean_forbids_new_task_for_deactivated_worker(worker):
+    """Уровень модели: то же правило, что в сериализаторе, но для админки."""
+    worker.is_active = False
+    worker.save()
+
+    with pytest.raises(ValidationError):
+        Task(title='Заменить фильтр', worker=worker).full_clean()
+
+
+def test_clean_allows_saving_existing_task_of_deactivated_worker(worker):
+    task = Task.objects.create(title='Собрать раму', worker=worker)
+    worker.is_active = False
+    worker.save()
+
+    task.status = Task.Status.DONE
+    task.full_clean()  # не должно бросить
+    task.save()
+
+    assert task.status == Task.Status.DONE
+
+
+def test_api_serialises_timestamps(api, workshop):
+    fields = api.get('/api/workshops/').json()['results'][0]
+
+    assert 'created_at' in fields
+    assert 'updated_at' in fields
