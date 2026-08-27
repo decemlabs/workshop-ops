@@ -105,9 +105,6 @@ def test_api_forbids_assigning_task_to_deactivated_worker(api, worker):
 
 
 def test_api_allows_editing_task_of_deactivated_worker(api, worker):
-    """Уволенный не мешает править старые задачи: worker в PATCH не приходит,
-    поэтому validate_worker не срабатывает.
-    """
     task = Task.objects.create(title='Собрать раму', worker=worker)
     worker.is_active = False
     worker.save()
@@ -160,3 +157,72 @@ def test_api_serialises_timestamps(api, workshop):
 
     assert 'created_at' in fields
     assert 'updated_at' in fields
+
+
+@pytest.fixture
+def shift(db):
+    """Смена как на макете сводки: 5 в работе, 2 новых, 4 выполненных."""
+    hot = Workshop.objects.create(name='Сборочный')
+    cold = Workshop.objects.create(name='Покрасочный')
+    ivanov = Worker.objects.create(name='Иванов', workshop=hot)
+    petrov = Worker.objects.create(name='Петров', workshop=cold)
+
+    for i in range(5):
+        Task.objects.create(title=f'В работе {i}', worker=ivanov, status=Task.Status.IN_PROGRESS)
+    for i in range(2):
+        Task.objects.create(title=f'Новая {i}', worker=ivanov, status=Task.Status.NEW)
+    for i in range(4):
+        Task.objects.create(title=f'Выполнена {i}', worker=petrov, status=Task.Status.DONE)
+    return {'hot': hot, 'cold': cold, 'ivanov': ivanov, 'petrov': petrov}
+
+
+def test_summary_counts_by_status(api, shift):
+    body = api.get('/api/tasks/summary/').json()
+
+    assert body['total'] == 11
+    assert {i['status']: i['count'] for i in body['by_status']} == {
+        'new': 2,
+        'in_progress': 5,
+        'done': 4,
+    }
+
+
+def test_summary_includes_statuses_without_tasks(api, worker):
+    Task.objects.create(title='Одна', worker=worker, status=Task.Status.NEW)
+
+    body = api.get('/api/tasks/summary/').json()
+
+    assert len(body['by_status']) == 3
+    assert {i['status']: i['count'] for i in body['by_status']}['done'] == 0
+
+
+def test_summary_respects_filters(api, shift):
+    body = api.get(f'/api/tasks/summary/?worker__workshop={shift["cold"].pk}').json()
+
+    assert body['total'] == 4
+    assert {i['status']: i['count'] for i in body['by_status']}['done'] == 4
+
+
+def test_filter_tasks_by_status(api, shift):
+    assert api.get('/api/tasks/?status=in_progress').json()['count'] == 5
+
+
+def test_filter_workers_by_workshop(api, shift):
+    response = api.get(f'/api/workers/?workshop={shift["hot"].pk}')
+
+    assert response.json()['count'] == 1
+    assert response.json()['results'][0]['name'] == 'Иванов'
+
+
+def test_search_workers_by_name(api, shift):
+    assert api.get('/api/workers/?search=Петр').json()['count'] == 1
+
+
+def test_search_tasks_by_worker_name(api, shift):
+    assert api.get('/api/tasks/?search=Петров').json()['count'] == 4
+
+
+def test_ordering_tasks_by_title(api, shift):
+    titles = [t['title'] for t in api.get('/api/tasks/?ordering=title').json()['results']]
+
+    assert titles == sorted(titles)
