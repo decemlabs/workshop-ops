@@ -1,14 +1,16 @@
-"""Корневой роутер REST API.
-
-Приложения регистрируют здесь свои ViewSet'ы:
-
-    from apps.users.views import UserViewSet
-    router.register('users', UserViewSet, basename='user')
+"""
+Корневой роутер REST API.
 """
 
 from rest_framework.routers import DefaultRouter
 
+from apps.workshops.views import TaskViewSet, WorkerViewSet, WorkshopViewSet
+
 router = DefaultRouter()
+
+router.register('workshops', WorkshopViewSet)
+router.register('workers', WorkerViewSet)
+router.register('tasks', TaskViewSet)
 
 app_name = 'api'
 urlpatterns = router.urls

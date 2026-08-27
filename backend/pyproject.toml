@@ -30,7 +30,7 @@ packages = [
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.local"
-python_files = ["test_*.py", "*_test.py"]
+python_files = ["test_*.py", "*_test.py", "tests.py"]
 testpaths = ["src"]
 
 [tool.ruff]
@@ -50,6 +50,12 @@ select = [
     "DJ",   # flake8-django
     "RUF",  # ruff-specific
 ]
+ignore = [
+    "RUF012",
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "src/config/settings/local.py" = ["F403", "F405"]
@@ -67,6 +73,4 @@ venv = ".venv"
 include = ["src", "manage.py"]
 exclude = ["**/migrations", "**/__pycache__", "**/.venv"]
 extraPaths = ["src"]
-# basedpyright по умолчанию включает режим "recommended" — для Django он
-# даёт сотни предупреждений про нетипизированные атрибуты моделей.
 typeCheckingMode = "standard"
