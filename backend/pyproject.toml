@@ -60,3 +60,13 @@ known-first-party = ["config", "apps"]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+include = ["src", "manage.py"]
+exclude = ["**/migrations", "**/__pycache__", "**/.venv"]
+extraPaths = ["src"]
+# basedpyright по умолчанию включает режим "recommended" — для Django он
+# даёт сотни предупреждений про нетипизированные атрибуты моделей.
+typeCheckingMode = "standard"

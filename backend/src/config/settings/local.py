@@ -7,7 +7,12 @@ SECRET_KEY = env.str(
 
 DEBUG = True
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+# django-environ аннотирует параметр default сентинелом NoValue,
+# из-за чего проверка типов ругается на любое реальное значение.
+ALLOWED_HOSTS = env.list(
+    'ALLOWED_HOSTS',
+    default=['localhost', '127.0.0.1'],  # pyright: ignore[reportArgumentType]
+)
 
 DATABASES = {'default': env.db('DATABASE_URL')}
 

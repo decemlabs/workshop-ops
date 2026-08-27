@@ -1,0 +1,8 @@
+{
+  "venvPath": "backend",
+  "venv": ".venv",
+  "include": ["backend/src", "backend/manage.py"],
+  "exclude": ["**/migrations", "**/__pycache__", "**/.venv"],
+  "extraPaths": ["backend/src"],
+  "typeCheckingMode": "standard"
+}

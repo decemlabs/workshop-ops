@@ -7,6 +7,6 @@ class User(AbstractUser):
     Заведена пустой на старте проекта, чтобы добавлять поля без миграции AUTH_USER_MODEL.
     """
 
-    class Meta(AbstractUser.Meta):
+    class Meta:
         verbose_name = 'пользователь'
         verbose_name_plural = 'пользователи'
