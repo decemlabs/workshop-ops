@@ -1,0 +1,17 @@
+[project]
+name = "workshop-ops-backend"
+version = "0.1.0"
+description = "Backend для управления цехами, рабочими и задачами"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.1",
+    "djangorestframework>=3.18.0",
+    "psycopg[binary]>=3.3.4",
+]
+
+[dependency-groups]
+dev = [
+    "django-types>=0.24.0",
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+]
