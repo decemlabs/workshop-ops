@@ -1,75 +1,62 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SPA на React 19 + TypeScript + Vite. Данные берёт из REST API Django (`../backend`).
 
-Currently, two official plugins are available:
+## Запуск
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+bun install
+bun run dev        # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Дев-сервер проксирует `/api`, `/api-auth`, `/admin` и `/static` на Django
+(`http://127.0.0.1:8000`, переопределяется переменной `BACKEND_URL` — см. `.env.example`).
+Благодаря прокси браузер видит фронт и бэк как один origin: не нужны ни CORS,
+ни `CSRF_TRUSTED_ORIGINS`, сессионная кука ставится обычным способом.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Скрипты: `dev`, `build`, `preview`, `typecheck`, `lint`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Структура
 
 ```
+src/
+  api/
+    client.ts       fetch-обёртка: базовый URL, X-CSRFToken, ApiError с разбором ошибок DRF
+    types.ts        типы моделей, входных данных и query-параметров
+    resources.ts    CRUD по /workshops/, /workers/, /tasks/ (+ /tasks/summary/)
+  hooks/
+    createResourceHooks.ts  фабрика react-query хуков (список, деталь, create/update/delete)
+    useWorkshops.ts / useWorkers.ts / useTasks.ts
+  app/
+    App.tsx         провайдеры (react-query + роутер)
+    router.tsx      маршруты
+    queryClient.ts  настройки кэша и ретраев
+  components/       Layout, QueryState (загрузка/ошибка)
+  pages/            заготовки страниц под будущие шаблоны
+```
+
+Алиас `@/` указывает на `src/` (настроен в `vite.config.ts` и `tsconfig.app.json`).
+
+## Маршруты
+
+| Путь          | Страница         |
+| ------------- | ---------------- |
+| `/`           | редирект на `/tasks` |
+| `/workshops`  | цеха             |
+| `/workers`    | рабочие          |
+| `/tasks`      | задачи           |
+| остальное     | 404              |
+
+## Куда класть готовые шаблоны
+
+Разметка страниц в `src/pages/*` — временная заготовка: она только показывает,
+что данные доходят. Готовый html переносим в JSX соответствующей страницы,
+его css — рядом с компонентом (`Тasks.css` + `import './Tasks.css'`) или в
+`src/index.css`, если стили общие. Хуки данных и API-слой при этом не меняются.
+
+## Авторизация
+
+API отдаёт данные только авторизованным (`IsAuthenticated` + `SessionAuthentication`).
+Пока на фронте нет формы входа: залогиниться можно через `/admin/` или `/api-auth/login/`
+(они проксируются), после чего SPA работает по той же сессионной куке.
+Изменяющие запросы шлют `X-CSRFToken` из куки `csrftoken`, если она уже выставлена Django.
