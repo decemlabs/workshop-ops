@@ -3,10 +3,7 @@
 #   docker compose up -d          поднять
 #   docker compose down           остановить (данные остаются в volume)
 #   docker compose down -v        остановить и удалить данные
-#
-# Порт на хосте по умолчанию 5433, чтобы не конфликтовать с чужим postgres
-# на 5432. Переопределяется переменными в .env рядом с этим файлом:
-#   POSTGRES_PORT=5432
+
 name: workshop-ops
 
 services:
@@ -18,10 +15,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - '${POSTGRES_PORT:-5433}:5432'
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
-      # В образе postgres:18 данные лежат в /var/lib/postgresql/18/docker,
-      # а томом объявлен весь /var/lib/postgresql — монтируем именно его.
       - pgdata:/var/lib/postgresql
     healthcheck:
       test:
@@ -33,7 +28,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-    # Уровень логирования по умолчанию слишком болтливый для локальной разработки.
     command: ['postgres', '-c', 'log_min_messages=warning']
 
 volumes:
