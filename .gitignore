@@ -1,0 +1,181 @@
+# ============================================
+# Python
+# ============================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.ipynb_checkpoints/
+.tox/
+.nox/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+wheels/
+
+# ============================================
+# Django
+# ============================================
+
+*.log
+db.sqlite3
+db.sqlite3-journal
+*.sqlite
+*.sqlite3
+
+# Django generated files
+media/
+staticfiles/
+
+# ============================================
+# Environment / Secrets
+# ============================================
+
+.env
+.env.*
+!.env.example
+
+# Certificates / keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# ============================================
+# Node.js
+# ============================================
+
+node_modules/
+
+# npm
+.npm/
+npm-debug.log*
+npm-error.log*
+
+# Yarn
+.yarn/
+.yarn-cache/
+yarn-debug.log*
+yarn-error.log*
+
+# pnpm
+.pnpm-store/
+pnpm-debug.log*
+
+# ============================================
+# JavaScript / Frontend
+# ============================================
+
+dist/
+build/
+.next/
+.nuxt/
+.output/
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+
+# Frontend environment
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================
+# Docker
+# ============================================
+
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ============================================
+# IDE
+# ============================================
+
+.idea/
+.vscode/
+*.iml
+
+# VS Code local history
+.history/
+
+# ============================================
+# Claude Code — полностью игнорируем
+# ============================================
+
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+
+# ============================================
+# Other AI assistants
+# ============================================
+
+.cursor/
+.cursorignore
+
+.windsurf/
+
+.aider*
+.aider/
+
+.continue/
+
+# ============================================
+# OS
+# ============================================
+
+.DS_Store
+.DS_Store?
+._*
+
+.Spotlight-V100
+.Trashes
+
+Thumbs.db
+Desktop.ini
+
+# ============================================
+# Temporary files
+# ============================================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.bak
+
+# ============================================
+# Logs
+# ============================================
+
+logs/
+*.log
