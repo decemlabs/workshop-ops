@@ -39,9 +39,9 @@ class Worker(TimestampedModel):
 
 class Task(TimestampedModel):
     class Status(models.TextChoices):
-        NEW = 'new', 'новая'
-        IN_PROGRESS = 'in_progress', 'в работе'
-        DONE = 'done', 'выполнена'
+        NEW = 'new', 'Новая'
+        IN_PROGRESS = 'in_progress', 'В работе'
+        DONE = 'done', 'Выполнено'
 
     title = models.CharField(max_length=100)
     worker = models.ForeignKey(Worker, on_delete=models.PROTECT, related_name='tasks')

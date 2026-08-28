@@ -226,3 +226,14 @@ def test_ordering_tasks_by_title(api, shift):
     titles = [t['title'] for t in api.get('/api/tasks/?ordering=title').json()['results']]
 
     assert titles == sorted(titles)
+
+
+def test_summary_labels_match_design(api, shift):
+    """Подписи статусов приходят с бэкенда"""
+    body = api.get('/api/tasks/summary/').json()
+
+    assert {i['status']: i['label'] for i in body['by_status']} == {
+        'new': 'Новая',
+        'in_progress': 'В работе',
+        'done': 'Выполнено',
+    }
