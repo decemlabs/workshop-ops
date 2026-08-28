@@ -42,7 +42,7 @@ import {
   useWorkshops,
 } from '@/hooks/useWorkshops'
 
-import { DICT_PAGE, INITIAL_STATE, PAGE, STATUSES } from './mock'
+import { DICT_PAGE, INITIAL_STATE, PAGE, STATUSES } from './constants'
 import { SETTINGS } from './settings'
 import { STATUS_CODE } from './status'
 import type { Confirm, Modal, State, Status } from './types'

@@ -10,7 +10,7 @@ import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react'
 
 import type { Task as ApiTask, Worker as ApiWorker, Workshop } from '@/api/types'
 
-import { COLORS, PAGE, STATUSES } from './mock'
+import { COLORS, PAGE, STATUSES } from './constants'
 import { SETTINGS } from './settings'
 import { STATUS_LABEL } from './status'
 import type { AppModel } from './useAppModel'
