@@ -67,7 +67,8 @@ function extractMessage(status: number, data: unknown): string {
     }
   }
 
-  return `Ошибка запроса (${status})`
+  // 5xx приходит и от самого Django, и от прокси, когда бэк не поднят.
+  return status >= 500 ? `Сервер не отвечает (${status})` : `Ошибка запроса (${status})`
 }
 
 /**

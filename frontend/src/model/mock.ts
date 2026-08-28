@@ -34,7 +34,6 @@ export const INITIAL_STATE: State = {
   dirS: 1,
   dragOver: null,
   actionErr: null,
-  online: true,
   sortW: 'name',
   dirW: 1,
   sortT: 'title',

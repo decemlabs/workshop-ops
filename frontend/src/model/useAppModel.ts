@@ -97,12 +97,12 @@ function errorText(error: unknown): string {
     const [first] = Object.values(error.fieldErrors)
     return first?.[0] ?? error.message
   }
-  return 'Не удалось выполнить запрос'
+  // Сюда попадает и сбой сети: fetch бросает TypeError, ответа нет вообще.
+  return 'Нет связи с сервером'
 }
 
 export function useAppModel() {
-  // online берём сразу из навигатора: в оригинале это делал setState на маунте.
-  const [st, setSt] = useState<State>(() => ({ ...INITIAL_STATE, online: navigator.onLine }))
+  const [st, setSt] = useState<State>(INITIAL_STATE)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { pathname } = useLocation()
@@ -132,16 +132,10 @@ export function useAppModel() {
       if (stRef.current.confirm) setState({ confirm: null })
       else if (stRef.current.modal) setState({ modal: null })
     }
-    const onNet = () => setState({ online: navigator.onLine })
-
     window.addEventListener('keydown', onEsc)
-    window.addEventListener('online', onNet)
-    window.addEventListener('offline', onNet)
 
     return () => {
       window.removeEventListener('keydown', onEsc)
-      window.removeEventListener('online', onNet)
-      window.removeEventListener('offline', onNet)
       if (timer.current) clearTimeout(timer.current)
     }
   }, [setState])
@@ -214,8 +208,9 @@ export function useAppModel() {
   const bulkTaskStatus = useBulkTaskStatus()
 
   /** Запросы текущего экрана: по ним считаются скелетон и баннер ошибки. */
-  const active = [workshops, workersDict, summary, workersPage, shopWorkers, workerDetail, workerTasks, tasksPage]
-  const failed = active.find((query) => query.error)
+  const active = [me, workshops, workersDict, summary, workersPage, shopWorkers, workerDetail, workerTasks, tasksPage]
+  // 401/403 у me — это «нужен вход», а не сбой; всё остальное идёт в баннер.
+  const failed = active.find((query) => query.error && !isUnauthenticated(query.error))
 
   const load = useCallback(() => {
     setState({ actionErr: null })
@@ -474,7 +469,7 @@ export function useAppModel() {
 
     const logout = () =>
       logoutMutation.mutate(undefined, {
-        onSuccess: () => setState({ ...INITIAL_STATE, online: navigator.onLine }),
+        onSuccess: () => setState(INITIAL_STATE),
       })
 
     return {
@@ -530,10 +525,13 @@ export function useAppModel() {
   /** Данные для разметки: пустые списки, пока запрос не пришёл. */
   const data = {
     authed,
-    authBusy: login.isPending || me.isLoading,
+    // Форму входа показываем, только когда сервер ответил «не авторизован».
+    // Пока проверка идёт — скелетон, если сервер недоступен — баннер ошибки.
+    anonymous: isUnauthenticated(me.error),
+    authBusy: login.isPending,
     // isLoading, а не isPending: выключенные до входа запросы «висят» в pending.
     loading: active.some((query) => query.isLoading),
-    error: st.actionErr ?? (failed && !isUnauthenticated(failed.error) ? errorText(failed.error) : null),
+    error: st.actionErr ?? (failed ? errorText(failed.error) : null),
     workshops: (workshops.data?.results ?? []),
     shopsCount: workshops.data?.count ?? 0,
     workersDict: (workersDict.data?.results ?? []),

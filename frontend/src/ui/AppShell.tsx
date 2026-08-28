@@ -1,7 +1,7 @@
 import { s } from '@/design/style'
 import { useV } from '@/model/context'
 
-import { ErrorBanner, OfflineBanner } from './Banners'
+import { ErrorBanner } from './Banners'
 import { ConfirmModal } from './ConfirmModal'
 import { FormModal } from './FormModal'
 import { LoadingOverlay } from './LoadingOverlay'
@@ -29,7 +29,6 @@ export function AppShell() {
         <Sidebar />
 
         <div style={s('padding:0 0 40px;position:relative')}>
-          <OfflineBanner />
           <ErrorBanner />
           <LoadingOverlay />
 

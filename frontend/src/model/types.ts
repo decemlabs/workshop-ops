@@ -55,7 +55,6 @@ export interface State {
   dragOver: number | null
   /** Ошибка действия (сохранение, удаление) — в баннере, а не в модалке. */
   actionErr: string | null
-  online: boolean
   sortW: SortW
   dirW: number
   sortT: SortT

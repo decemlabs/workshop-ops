@@ -1,18 +1,6 @@
 import { dc, s } from '@/design/style'
 import { useV } from '@/model/context'
 
-/** Баннер потери связи с сервером. */
-export function OfflineBanner() {
-  const v = useV()
-  if (!v.offline) return null
-
-  return (
-    <div role="status" style={s("display:flex;align-items:center;gap:10px;padding:10px 22px;background:var(--surface-2);border-bottom:1px solid rgba(var(--ink-rgb),.25);font:500 12.5px 'IBM Plex Sans',sans-serif;color:var(--muted-strong)")}>
-      <span style={s('width:9px;height:9px;border-radius:50%;background:var(--danger);display:inline-block')}></span>Нет связи с сервером. Изменения сохранятся локально и отправятся при восстановлении сети.
-    </div>
-  )
-}
-
 /** Баннер ошибки загрузки с кнопкой повтора. */
 export function ErrorBanner() {
   const v = useV()
