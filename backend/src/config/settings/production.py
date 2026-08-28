@@ -6,6 +6,11 @@ DEBUG = False
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
+# Django сверяет Origin с хостом запроса. Если фронт стоит на своём домене
+# (VITE_API_URL во фронте), его нужно перечислить со схемой, иначе все POST
+# отвалятся с «Origin checking failed». Один домен на фронт и бэк — оставляем пустым.
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])  # pyright: ignore[reportArgumentType]
+
 DATABASES = {'default': env.db('DATABASE_URL')}
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
