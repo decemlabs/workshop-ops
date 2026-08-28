@@ -8,13 +8,13 @@ import { mockFetch, page } from '@/test/mockFetch'
 import { parseRoute, useAppModel } from './useAppModel'
 
 test('адрес разбирается в экран и идентификатор', () => {
-  expect(parseRoute('/shops')).toEqual({ view: 'shops', shopId: 0, workerId: 0 })
-  expect(parseRoute('/shops/3')).toEqual({ view: 'shop', shopId: 3, workerId: 0 })
+  expect(parseRoute('/workshops')).toEqual({ view: 'shops', shopId: 0, workerId: 0 })
+  expect(parseRoute('/workshops/3')).toEqual({ view: 'shop', shopId: 3, workerId: 0 })
   expect(parseRoute('/workers')).toEqual({ view: 'workers', shopId: 0, workerId: 0 })
   expect(parseRoute('/workers/2')).toEqual({ view: 'worker', shopId: 0, workerId: 2 })
   expect(parseRoute('/tasks')).toEqual({ view: 'tasks', shopId: 0, workerId: 0 })
   expect(parseRoute('/')).toBeNull()
-  expect(parseRoute('/shops/abc')).toBeNull()
+  expect(parseRoute('/workshops/abc')).toBeNull()
 })
 
 test('фильтры, сортировка и страница уходят запросом на сервер', async () => {

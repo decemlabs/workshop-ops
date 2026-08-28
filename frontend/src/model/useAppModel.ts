@@ -55,13 +55,13 @@ interface Route {
   workerId: number
 }
 
-/** Разбирает адрес в view + идентификаторы: /shops, /shops/3, /workers, /workers/2, /tasks. */
+/** Разбирает адрес в view + идентификаторы: /workshops, /workshops/3, /workers, /workers/2, /tasks. */
 export function parseRoute(pathname: string): Route | null {
-  const m = /^\/(shops|workers|tasks)(?:\/(\d+))?\/?$/.exec(pathname)
+  const m = /^\/(workshops|workers|tasks)(?:\/(\d+))?\/?$/.exec(pathname)
   if (!m) return null
 
   const id = m[2] ? Number(m[2]) : 0
-  if (m[1] === 'shops') return { view: id ? 'shop' : 'shops', shopId: id, workerId: 0 }
+  if (m[1] === 'workshops') return { view: id ? 'shop' : 'shops', shopId: id, workerId: 0 }
   if (m[1] === 'workers') return { view: id ? 'worker' : 'workers', shopId: 0, workerId: id }
   return { view: 'tasks', shopId: 0, workerId: 0 }
 }
@@ -302,13 +302,13 @@ export function useAppModel() {
         if (c.kind === 'shop') {
           await deleteWorkshop.mutateAsync(c.id)
           startUndo(`Цех «${c.label}» удалён`, () => restoreWorkshops.mutateAsync({ ids: [c.id] }))
-          if (view === 'shop' && route.shopId === c.id) navigate('/shops')
+          if (view === 'shop' && route.shopId === c.id) navigate('/workshops')
         } else if (c.kind === 'worker') {
           const shopId = workerDetail.data?.workshop
           await deleteWorker.mutateAsync(c.id)
           startUndo(`Рабочий «${c.label}» удалён`, () => restoreWorkers.mutateAsync({ ids: [c.id] }))
           if (view === 'worker' && route.workerId === c.id) {
-            navigate(shopId ? '/shops/' + shopId : '/shops')
+            navigate(shopId ? '/workshops/' + shopId : '/workshops')
           }
         } else {
           await deleteTask.mutateAsync(c.id)
@@ -543,6 +543,7 @@ export function useAppModel() {
   /** Данные для разметки: пустые списки, пока запрос не пришёл. */
   const data = {
     authed,
+    userName: me.data?.name ?? '',
     // Форму входа показываем, только когда сервер ответил «не авторизован».
     // Пока проверка идёт — скелетон, если сервер недоступен — баннер ошибки.
     anonymous: isUnauthenticated(me.error),

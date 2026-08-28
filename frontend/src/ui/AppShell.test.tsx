@@ -28,7 +28,7 @@ function renderApp() {
 
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/shops']}>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={['/workshops']}>{children}</MemoryRouter>
     </QueryClientProvider>
   )
 

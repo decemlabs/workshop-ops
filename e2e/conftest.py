@@ -215,7 +215,7 @@ def rows(page: Page, kind: str):
 def sign_in(page: Page, credentials: tuple[str, str]) -> None:
     username, password = credentials
 
-    page.goto('/shops')
+    page.goto('/workshops')
     page.get_by_label('ЛОГИН').fill(username)
     page.get_by_label('ПАРОЛЬ').fill(password)
     page.get_by_role('button', name='Войти').click()

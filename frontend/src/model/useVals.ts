@@ -200,6 +200,7 @@ export function useVals(model: AppModel) {
     theme: SETTINGS.darkTheme ? 'dark' : 'light',
     touch: SETTINGS.touchMode ? '1' : '0',
     shiftDate: shiftDate,
+    userName: data.userName,
     loading: data.loading,
     notLoading: !data.loading,
     errorOpen: !!data.error,
@@ -232,7 +233,7 @@ export function useVals(model: AppModel) {
     isWorker: view === 'worker',
     isWorkersAll: view === 'workers',
     isTasksAll: view === 'tasks',
-    navShops: () => navigate('/shops'),
+    navShops: () => navigate('/workshops'),
     navWorkers: () => navigate('/workers'),
     navTasks: () => navigate('/tasks'),
     navShopsBg: navBg('shops'),
@@ -264,7 +265,7 @@ export function useVals(model: AppModel) {
           h: Math.max(4, Math.round((26 * v) / max)) + 'px',
           c: v === max && v > 0 ? 'var(--accent)' : 'rgba(var(--accent-rgb),.35)',
         })),
-        open: () => navigate('/shops/' + s.id),
+        open: () => navigate('/workshops/' + s.id),
         edit: () => openModal({ kind: 'shop', id: s.id, name: s.name, num: s.number }),
         del: () => askDelete({ kind: 'shop', id: s.id, label: shopLabel(s.number, s.name) }),
       }
@@ -358,7 +359,7 @@ export function useVals(model: AppModel) {
       : '',
     workerTaskRows: data.workerTasks.map(taskRow),
     workerEmpty: !!curW && data.workerTasks.length === 0,
-    backToShop: () => navigate(curW ? '/shops/' + curW.workshop : '/shops'),
+    backToShop: () => navigate(curW ? '/workshops/' + curW.workshop : '/workshops'),
     editWorker: () =>
       curW && openModal({ kind: 'worker', id: curW.id, name: curW.name, shopId: curW.workshop }),
     addTask: () =>
