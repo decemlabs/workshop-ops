@@ -16,9 +16,15 @@ DATABASES = {'default': env.db('DATABASE_URL')}
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000
+
+# Всё, что требует HTTPS, снимается одним флагом: прод-сборку проверяют локально
+# по http://localhost, а там редирект зациклится и Secure-куки не доедут до браузера.
+# В настоящем проде флаг не трогаем.
+HTTPS_ONLY = env.bool('HTTPS_ONLY', default=True)
+
+SECURE_SSL_REDIRECT = HTTPS_ONLY
+SESSION_COOKIE_SECURE = HTTPS_ONLY
+CSRF_COOKIE_SECURE = HTTPS_ONLY
+SECURE_HSTS_SECONDS = 31536000 if HTTPS_ONLY else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

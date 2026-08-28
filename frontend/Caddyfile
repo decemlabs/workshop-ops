@@ -1,0 +1,29 @@
+# Фронт и бэк за одним origin — как прокси дев-сервера Vite, только в проде.
+# Поэтому браузеру не нужны ни CORS, ни CSRF_TRUSTED_ORIGINS.
+:80 {
+	root * /usr/share/caddy
+	encode zstd gzip
+
+	# Хэш в имени файла — можно кэшировать навсегда.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# Статика Django (админка) из тома, который наполняет collectstatic.
+	handle_path /static/* {
+		root * /var/www/static
+		file_server
+	}
+
+	# reverse_proxy сам проставляет X-Forwarded-Proto и не подменяет Host: Django
+	# сверяет Origin с хостом запроса, и без порта в Host POST падал бы с CSRF.
+	@backend path /api /api/* /api-auth /api-auth/* /admin /admin/*
+	handle @backend {
+		reverse_proxy backend:8000
+	}
+
+	# Адреса вроде /shops/3 живут в браузере: файла под них нет, отдаём index.html.
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
