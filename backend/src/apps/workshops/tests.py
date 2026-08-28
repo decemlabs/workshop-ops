@@ -366,3 +366,84 @@ def test_api_hides_deactivated_tasks_by_default(api, worker):
 
     assert api.get('/api/tasks/').json()['count'] == 0
     assert api.get('/api/tasks/?is_active=all').json()['count'] == 1
+
+
+def test_workshop_stats_are_annotated(api, shift):
+    by_name = {w['name']: w for w in api.get('/api/workshops/').json()['results']}
+
+    assert by_name['Сборочный']['workers_count'] == 1
+    assert by_name['Сборочный']['active_tasks'] == 7  # 5 в работе + 2 новых
+    assert by_name['Сборочный']['done_tasks'] == 0
+    assert by_name['Покрасочный']['done_tasks'] == 4
+    assert by_name['Покрасочный']['active_tasks'] == 0
+
+
+def test_workshop_stats_are_zero_not_null_without_workers(api, workshop):
+    row = api.get('/api/workshops/').json()['results'][0]
+
+    assert (row['workers_count'], row['active_tasks'], row['done_tasks']) == (0, 0, 0)
+
+
+def test_workshop_stats_ignore_deactivated(api, shift):
+    api.delete(f'/api/workers/{shift["ivanov"].pk}/')
+
+    row = next(w for w in api.get('/api/workshops/').json()['results'] if w['number'] == 10)
+
+    assert row['workers_count'] == 0
+    assert row['active_tasks'] == 0
+
+
+def test_workshop_card_carries_worker_load(api, shift):
+    row = next(w for w in api.get('/api/workshops/').json()['results'] if w['number'] == 10)
+
+    assert row['workers_load'] == [{'id': shift['ivanov'].pk, 'name': 'Иванов', 'active_tasks': 7}]
+
+
+def test_worker_stats_are_annotated(api, shift):
+    row = next(w for w in api.get('/api/workers/').json()['results'] if w['name'] == 'Иванов')
+
+    assert row['tasks_total'] == 7
+    assert row['active_tasks'] == 7
+    assert row['done_tasks'] == 0
+    assert row['workshop_number'] == 10
+
+
+def test_worker_last_task_is_the_freshest(api, worker):
+    Task.objects.create(title='Старая', worker=worker)
+    Task.objects.create(title='Свежая', worker=worker)
+
+    row = api.get('/api/workers/').json()['results'][0]
+
+    assert row['last_task_title'] == 'Свежая'
+
+
+def test_worker_last_task_is_null_without_tasks(api, worker):
+    assert api.get('/api/workers/').json()['results'][0]['last_task_title'] is None
+
+
+def test_worker_list_does_not_scale_queries_with_rows(api, shift):
+    with CaptureQueriesContext(connection) as before:
+        api.get('/api/workers/')
+
+    for extra in range(5):
+        worker = Worker.objects.create(name=f'Сидоров {extra}', workshop=shift['hot'])
+        Task.objects.create(title=f'Задача {extra}', worker=worker)
+
+    with CaptureQueriesContext(connection) as after:
+        api.get('/api/workers/')
+
+    assert len(after) == len(before)
+
+
+def test_workshop_list_does_not_scale_queries_with_rows(api, shift):
+    """Prefetch для workers_load: карточки не должны стоить по запросу каждая"""
+    with CaptureQueriesContext(connection) as before:
+        api.get('/api/workshops/')
+
+    for extra in range(5):
+        Workshop.objects.create(number=100 + extra, name=f'Цех {extra}')
+
+    with CaptureQueriesContext(connection) as after:
+        api.get('/api/workshops/')
+
+    assert len(after) == len(before)

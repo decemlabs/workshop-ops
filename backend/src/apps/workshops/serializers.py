@@ -3,15 +3,48 @@ from rest_framework import serializers
 from .models import Task, Worker, Workshop
 
 
+class WorkerLoadSerializer(serializers.ModelSerializer):
+    """Столбик загрузки одного рабочего на карточке цеха."""
+
+    active_tasks = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Worker
+        fields = ['id', 'name', 'active_tasks']
+
+
 class WorkshopSerializer(serializers.ModelSerializer):
+    # Все счётчики приходят из annotate в WorkshopViewSet.get_queryset().
+    workers_count = serializers.IntegerField(read_only=True)
+    active_tasks = serializers.IntegerField(read_only=True)
+    done_tasks = serializers.IntegerField(read_only=True)
+    # Столбики на карточке. Идут через Prefetch, а не отдельным запросом на цех.
+    workers_load = WorkerLoadSerializer(source='workers', many=True, read_only=True)
+
     class Meta:
         model = Workshop
-        fields = ['id', 'number', 'name', 'is_active', 'created_at', 'updated_at']
+        fields = [
+            'id',
+            'number',
+            'name',
+            'is_active',
+            'workers_count',
+            'active_tasks',
+            'done_tasks',
+            'workers_load',
+            'created_at',
+            'updated_at',
+        ]
 
 
 class WorkerSerializer(serializers.ModelSerializer):
     # добавляем поле с названием цеха
     workshop_name = serializers.CharField(source='workshop.name', read_only=True)
+    workshop_number = serializers.IntegerField(source='workshop.number', read_only=True)
+    tasks_total = serializers.IntegerField(read_only=True)
+    active_tasks = serializers.IntegerField(read_only=True)
+    done_tasks = serializers.IntegerField(read_only=True)
+    last_task_title = serializers.CharField(read_only=True, allow_null=True)
 
     class Meta:
         model = Worker
@@ -20,7 +53,12 @@ class WorkerSerializer(serializers.ModelSerializer):
             'name',
             'workshop',
             'workshop_name',
+            'workshop_number',
             'is_active',
+            'tasks_total',
+            'active_tasks',
+            'done_tasks',
+            'last_task_title',
             'created_at',
             'updated_at',
         ]

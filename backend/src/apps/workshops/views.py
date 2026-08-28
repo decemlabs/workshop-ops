@@ -1,13 +1,14 @@
 from uuid import UUID, uuid4
 
 from django.db import transaction
-from django.db.models import Count, QuerySet
+from django.db.models import Count, Prefetch, QuerySet
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Task, Worker, Workshop
+from .querysets import with_worker_stats, with_workshop_stats
 from .serializers import (
     BulkIdsSerializer,
     TaskSerializer,
@@ -97,6 +98,16 @@ class WorkshopViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet)
     search_fields = ['name']
     ordering_fields = ['number', 'name', 'created_at']
 
+    def get_queryset(self):
+        # Prefetch иначе на список
+        # цехов уходит по запросу на карточку.
+        return with_workshop_stats(super().get_queryset()).prefetch_related(
+            Prefetch(
+                'workers',
+                queryset=with_worker_stats(Worker.objects.filter(is_active=True)),
+            )
+        )
+
     def cascade(self, queryset, batch):
         worker_ids = list(
             Worker.objects.filter(workshop__in=queryset, is_active=True).values_list(
@@ -117,6 +128,9 @@ class WorkerViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
     filterset_fields = ['workshop']
     search_fields = ['name']
     ordering_fields = ['name', 'created_at']
+
+    def get_queryset(self):
+        return with_worker_stats(super().get_queryset())
 
     def cascade(self, queryset, batch):
         return Task.objects.filter(worker__in=queryset, is_active=True).update(
