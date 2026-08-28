@@ -447,3 +447,72 @@ def test_workshop_list_does_not_scale_queries_with_rows(api, shift):
         api.get('/api/workshops/')
 
     assert len(after) == len(before)
+
+
+def test_bulk_delete_workers_reports_count(api, shift):
+    response = api.post('/api/workers/bulk-delete/', {'ids': [shift['ivanov'].pk]})
+
+    assert response.status_code == 200
+    assert response.json()['updated'] == 8  # рабочий + 7 его задач
+    assert api.get('/api/workers/').json()['count'] == 1
+
+
+def test_bulk_delete_shares_one_batch_and_one_restore(api, shift):
+    ids = [shift['ivanov'].pk, shift['petrov'].pk]
+    api.post('/api/workers/bulk-delete/', {'ids': ids})
+
+    assert api.post('/api/workers/restore/', {'ids': ids[:1]}).json()['updated'] == 13
+    assert api.get('/api/workers/').json()['count'] == 2
+
+
+def test_bulk_move_transfers_workers(api, shift):
+    response = api.post(
+        '/api/workers/bulk-move/',
+        {'ids': [shift['ivanov'].pk], 'workshop': shift['cold'].pk},
+    )
+
+    assert response.json()['updated'] == 1
+    assert Worker.objects.get(pk=shift['ivanov'].pk).workshop == shift['cold']
+
+
+def test_bulk_move_rejects_deleted_workshop(api, shift):
+    api.delete(f'/api/workshops/{shift["cold"].pk}/')
+
+    response = api.post(
+        '/api/workers/bulk-move/',
+        {'ids': [shift['ivanov'].pk], 'workshop': shift['cold'].pk},
+    )
+
+    assert response.status_code == 400
+    assert Worker.objects.get(pk=shift['ivanov'].pk).workshop == shift['hot']
+
+
+def test_bulk_status_changes_tasks(api, shift):
+    ids = list(Task.objects.filter(worker=shift['ivanov']).values_list('pk', flat=True))
+
+    response = api.post('/api/tasks/bulk-status/', {'ids': ids, 'status': 'done'})
+
+    assert response.json()['updated'] == 7
+    assert Task.objects.filter(worker=shift['ivanov'], status='done').count() == 7
+
+
+def test_bulk_status_rejects_unknown_status(api, shift):
+    task = Task.objects.filter(worker=shift['ivanov']).first()
+
+    response = api.post('/api/tasks/bulk-status/', {'ids': [task.pk], 'status': 'готово'})
+
+    assert response.status_code == 400
+    assert 'status' in response.json()
+
+
+def test_bulk_operation_rolls_back_on_unknown_id(api, shift):
+    ids = list(Task.objects.filter(worker=shift['ivanov']).values_list('pk', flat=True))
+
+    response = api.post('/api/tasks/bulk-status/', {'ids': [*ids, 9999], 'status': 'done'})
+
+    assert response.status_code == 400
+    assert Task.objects.filter(status='done').count() == 4
+
+
+def test_bulk_rejects_empty_ids(api, shift):
+    assert api.post('/api/workers/bulk-delete/', {'ids': []}).status_code == 400

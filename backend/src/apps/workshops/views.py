@@ -11,6 +11,8 @@ from .models import Task, Worker, Workshop
 from .querysets import with_worker_stats, with_workshop_stats
 from .serializers import (
     BulkIdsSerializer,
+    BulkMoveSerializer,
+    BulkStatusSerializer,
     TaskSerializer,
     WorkerSerializer,
     WorkshopSerializer,
@@ -137,6 +139,18 @@ class WorkerViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
             is_active=False, deleted_batch=batch
         )
 
+    @action(detail=False, methods=['post'], url_path='bulk-move')
+    def bulk_move(self, request):
+        serializer = BulkMoveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            updated = self.selection(serializer.validated_data['ids']).update(
+                workshop=serializer.validated_data['workshop']
+            )
+
+        return Response({'updated': updated})
+
 
 class TaskViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
     queryset = Task.objects.select_related('worker')
@@ -144,6 +158,18 @@ class TaskViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
     filterset_fields = ['status', 'worker', 'worker__workshop']
     search_fields = ['title', 'worker__name', 'code']
     ordering_fields = ['created_at', 'updated_at', 'title', 'code']
+
+    @action(detail=False, methods=['post'], url_path='bulk-status')
+    def bulk_status(self, request):
+        serializer = BulkStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            updated = self.selection(serializer.validated_data['ids']).update(
+                status=serializer.validated_data['status']
+            )
+
+        return Response({'updated': updated})
 
     @action(detail=False)
     def summary(self, request):

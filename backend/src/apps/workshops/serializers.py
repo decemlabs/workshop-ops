@@ -91,3 +91,14 @@ class BulkIdsSerializer(serializers.Serializer):
     """Список id для операции над группой записей"""
 
     ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+
+
+class BulkMoveSerializer(BulkIdsSerializer):
+    """Перевод группы рабочих в другой цех"""
+
+    # queryset ограничен активными: иначе рабочие уезжают в удалённый цех.
+    workshop = serializers.PrimaryKeyRelatedField(queryset=Workshop.objects.filter(is_active=True))
+
+
+class BulkStatusSerializer(BulkIdsSerializer):
+    status = serializers.ChoiceField(choices=Task.Status.choices)
