@@ -19,6 +19,8 @@ import type { Modal, State, Status } from './types'
 export interface Option {
   value: string
   label: string
+  /** Строка-пояснение в списке: выбрать её нельзя. */
+  disabled?: boolean
 }
 
 export interface TaskRow {
@@ -105,7 +107,7 @@ export function useVals(model: AppModel) {
   const showCodes = SETTINGS.showTaskCodes !== false
   const defStatus = SETTINGS.defaultTaskStatus || 'Новая'
   const m = st.modal
-  const cur = data.workshops.find((s) => s.id === route.shopId)
+  const cur = data.workshop
   const curW = data.worker
 
   const taskRow = (t: ApiTask): TaskRow => {
@@ -178,6 +180,14 @@ export function useVals(model: AppModel) {
   const pageLabel = (count: number, page: number) =>
     count === 0 ? '0' : `${(page - 1) * PAGE + 1}–${Math.min(count, page * PAGE)} из ${count}`
   const lastPage = (count: number) => Math.max(1, Math.ceil(count / PAGE))
+
+  /** Списки берутся одной страницей: если влезло не всё, говорим об этом прямо. */
+  const trimmed = (shown: number, total: number) =>
+    total > shown ? `показаны первые ${shown} из ${total}` : ''
+  const hintOption = (shown: number, total: number): Option[] => {
+    const hint = trimmed(shown, total)
+    return hint ? [{ value: '', label: `— ${hint} —`, disabled: true }] : []
+  }
 
   const nf = new Intl.NumberFormat('ru-RU')
   const shiftDate = new Intl.DateTimeFormat('ru-RU', {
@@ -267,7 +277,10 @@ export function useVals(model: AppModel) {
     shopSearchEmpty: !!st.qShop && data.shopWorkers.length === 0,
     qShop: st.qShop,
     onQShop: (e: ChangeEvent<HTMLInputElement>) => setState({ qShop: e.target.value }),
-    shopFound: data.shopWorkers.length,
+    shopFound:
+      trimmed(data.shopWorkers.length, data.shopWorkersFound) === ''
+        ? data.shopWorkers.length
+        : `${data.shopWorkers.length} из ${data.shopWorkersFound}`,
     sortSName: sArrow('name'),
     sortSLast: sArrow('last'),
     sortSLoad: sArrow('load'),
@@ -286,9 +299,11 @@ export function useVals(model: AppModel) {
       moveWorkers(st.selW, Number(e.target.value))
       e.target.value = ''
     },
-    moveShopOptions: ([{ value: '', label: 'Перевести в цех…' }] as Option[]).concat(
-      data.workshops.map((s) => ({ value: String(s.id), label: shopLabel(s.number, s.name) })),
-    ),
+    moveShopOptions: ([{ value: '', label: 'Перевести в цех…' }] as Option[])
+      .concat(
+        data.workshops.map((s) => ({ value: String(s.id), label: shopLabel(s.number, s.name) })),
+      )
+      .concat(hintOption(data.workshops.length, data.shopsCount)),
     selTCount: st.selT.length,
     selTOn: st.selT.length > 0,
     clearSelT: () => setState({ selT: [] }),
@@ -332,7 +347,15 @@ export function useVals(model: AppModel) {
 
     workerName: curW ? curW.name : 'Рабочий',
     workerShop: curW ? shopLabel(curW.workshop_number, curW.workshop_name) : '—',
-    workerMeta: curW ? 'активных ' + curW.active_tasks + ' · выполнено ' + curW.done_tasks : '',
+    workerMeta: curW
+      ? 'активных ' +
+        curW.active_tasks +
+        ' · выполнено ' +
+        curW.done_tasks +
+        (trimmed(data.workerTasks.length, data.workerTasksFound)
+          ? ' · ' + trimmed(data.workerTasks.length, data.workerTasksFound)
+          : '')
+      : '',
     workerTaskRows: data.workerTasks.map(taskRow),
     workerEmpty: !!curW && data.workerTasks.length === 0,
     backToShop: () => navigate(curW ? '/shops/' + curW.workshop : '/shops'),
@@ -354,15 +377,17 @@ export function useVals(model: AppModel) {
     fWorkerFilter: st.fWorker,
     onWorkerFilter: (e: ChangeEvent<HTMLSelectElement>) =>
       setState({ fWorker: e.target.value, pageT: 1 }),
-    shopFilterOptions: ([{ value: '', label: 'Все цеха' }] as Option[]).concat(
-      data.workshops.map((s) => ({ value: String(s.id), label: shopLabel(s.number, s.name) })),
-    ),
+    shopFilterOptions: ([{ value: '', label: 'Все цеха' }] as Option[])
+      .concat(
+        data.workshops.map((s) => ({ value: String(s.id), label: shopLabel(s.number, s.name) })),
+      )
+      .concat(hintOption(data.workshops.length, data.shopsCount)),
     statusFilterOptions: ([{ value: '', label: 'Все статусы' }] as Option[]).concat(
       STATUSES.map((s) => ({ value: s, label: s })),
     ),
-    workerFilterOptions: ([{ value: '', label: 'Все рабочие' }] as Option[]).concat(
-      data.workersDict.map((w) => ({ value: String(w.id), label: w.name })),
-    ),
+    workerFilterOptions: ([{ value: '', label: 'Все рабочие' }] as Option[])
+      .concat(data.workersDict.map((w) => ({ value: String(w.id), label: w.name })))
+      .concat(hintOption(data.workersDict.length, data.workersCount)),
     filtersOn: !!(st.q || st.fShop || st.fStatus || st.fWorker),
     resetFilters: () =>
       setState({ q: '', fShop: '', fStatus: '', fWorker: '', pageW: 1, pageT: 1 }),
@@ -432,18 +457,20 @@ export function useVals(model: AppModel) {
     showShop: !!m && m.kind === 'worker',
     fShop: m && m.shopId != null ? String(m.shopId) : '',
     onShop: field('shopId' as keyof Modal),
-    shopOptions: data.workshops.map(
-      (s): Option => ({ value: String(s.id), label: 'Цех №' + s.number + ' — ' + s.name }),
-    ),
+    shopOptions: data.workshops
+      .map((s): Option => ({ value: String(s.id), label: 'Цех №' + s.number + ' — ' + s.name }))
+      .concat(hintOption(data.workshops.length, data.shopsCount)),
     showWorkerSelect: !!m && m.kind === 'task',
     fWorker: m && m.workerId != null ? String(m.workerId) : '',
     onWorker: field('workerId' as keyof Modal),
-    workerOptions: data.workersDict.map(
-      (w): Option => ({
-        value: String(w.id),
-        label: w.name + ' · ' + shopLabel(w.workshop_number, w.workshop_name),
-      }),
-    ),
+    workerOptions: data.workersDict
+      .map(
+        (w): Option => ({
+          value: String(w.id),
+          label: w.name + ' · ' + shopLabel(w.workshop_number, w.workshop_name),
+        }),
+      )
+      .concat(hintOption(data.workersDict.length, data.workersCount)),
     showStatus: !!m && m.kind === 'task',
     fStatus: m ? m.status || defStatus : '',
     onStatus: field('status' as keyof Modal),

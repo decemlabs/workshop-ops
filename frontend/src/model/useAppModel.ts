@@ -38,6 +38,7 @@ import {
   useDeleteWorkshop,
   useRestoreWorkshops,
   useUpdateWorkshop,
+  useWorkshop,
   useWorkshops,
 } from '@/hooks/useWorkshops'
 
@@ -161,6 +162,12 @@ export function useAppModel() {
   }
   const workersPage = useWorkers(workerParams, { enabled: authed && view === 'workers' })
 
+  // Цех экрана запрашиваем отдельно, а не ищем в справочнике: иначе заголовок
+  // «Цех №N» пропадёт, как только цех не попадёт в первую страницу справочника.
+  const workshopDetail = useWorkshop(route.shopId || undefined, {
+    enabled: authed && view === 'shop',
+  })
+
   const shopWorkers = useWorkers(
     {
       workshop: route.shopId,
@@ -208,7 +215,18 @@ export function useAppModel() {
   const bulkTaskStatus = useBulkTaskStatus()
 
   /** Запросы текущего экрана: по ним считаются скелетон и баннер ошибки. */
-  const active = [me, workshops, workersDict, summary, workersPage, shopWorkers, workerDetail, workerTasks, tasksPage]
+  const active = [
+    me,
+    workshops,
+    workersDict,
+    summary,
+    workersPage,
+    workshopDetail,
+    shopWorkers,
+    workerDetail,
+    workerTasks,
+    tasksPage,
+  ]
   // 401/403 у me — это «нужен вход», а не сбой; всё остальное идёт в баннер.
   const failed = active.find((query) => query.error && !isUnauthenticated(query.error))
 
@@ -539,9 +557,12 @@ export function useAppModel() {
     summary: summary.data,
     workers: (workersPage.data?.results ?? []),
     workersFound: workersPage.data?.count ?? 0,
+    workshop: workshopDetail.data,
     shopWorkers: (shopWorkers.data?.results ?? []),
+    shopWorkersFound: shopWorkers.data?.count ?? 0,
     worker: workerDetail.data,
     workerTasks: (workerTasks.data?.results ?? []),
+    workerTasksFound: workerTasks.data?.count ?? 0,
     tasks: (tasksPage.data?.results ?? []),
     tasksFound: tasksPage.data?.count ?? 0,
   }
