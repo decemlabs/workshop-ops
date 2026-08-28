@@ -1,8 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 
 import { workersApi } from '@/api/resources'
 import type { BulkMoveInput } from '@/api/types'
-import { createResourceHooks } from './createResourceHooks'
+import { createResourceHooks, useInvalidateData } from './createResourceHooks'
 
 const hooks = createResourceHooks(workersApi, 'workers')
 
@@ -17,10 +17,10 @@ export const useRestoreWorkers = hooks.useRestore
 
 /** Перевод выбранных рабочих в другой цех — одним запросом. */
 export function useBulkMoveWorkers() {
-  const queryClient = useQueryClient()
+  const invalidateData = useInvalidateData()
 
   return useMutation({
     mutationFn: (payload: BulkMoveInput) => workersApi.bulkMove(payload),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: invalidateData,
   })
 }

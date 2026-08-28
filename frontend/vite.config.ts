@@ -19,12 +19,15 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      // Host не подменяем (changeOrigin по умолчанию false): Django сверяет
+      // заголовок Origin с хостом запроса, и при подмене на 127.0.0.1:8000
+      // POST-запросы отваливались бы с «Origin checking failed».
       proxy: {
-        '/api': { target: backend, changeOrigin: true },
+        '/api': { target: backend },
         // Логин/логаут браузерного интерфейса DRF (доступен при DEBUG=True).
-        '/api-auth': { target: backend, changeOrigin: true },
-        '/admin': { target: backend, changeOrigin: true },
-        '/static': { target: backend, changeOrigin: true },
+        '/api-auth': { target: backend },
+        '/admin': { target: backend },
+        '/static': { target: backend },
       },
     },
   }

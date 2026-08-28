@@ -1,16 +1,20 @@
 /**
  * Порт renderVals() из прототипа: значения, на которые ссылается разметка.
  *
- * Имена ключей и порядок вычислений — как в оригинале, чтобы компоненты можно было
- * сверять с шаблоном строка в строку.
+ * Имена ключей сохранены, изменились источники: строки приходят из API вместе
+ * с посчитанными на сервере агрегатами, а фильтры, сортировки и страницы уже
+ * применены запросом.
  */
 
 import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react'
 
+import type { Task as ApiTask, Worker as ApiWorker, Workshop } from '@/api/types'
+
 import { COLORS, PAGE, STATUSES } from './mock'
 import { SETTINGS } from './settings'
+import { STATUS_LABEL } from './status'
 import type { AppModel } from './useAppModel'
-import type { Modal, Shop, State, Status, Task, Worker } from './types'
+import type { Modal, State, Status } from './types'
 
 export interface Option {
   value: string
@@ -36,10 +40,7 @@ export interface WorkerRow {
   active: number
   done: number
   total: number
-  pct: string
   bar: string
-  load: string
-  chips: { c: string }[]
   lastTask: string
   open: () => void
   edit: () => void
@@ -72,6 +73,10 @@ export interface DropShop {
   onDrop: (e: DragEvent) => void
 }
 
+/** «Цех №10 · Механический» — подпись цеха во всех списках. */
+const shopLabel = (number?: number, name?: string) =>
+  number == null ? '—' : `Цех №${number} · ${name}`
+
 export function useVals(model: AppModel) {
   const {
     st,
@@ -81,14 +86,8 @@ export function useVals(model: AppModel) {
     route,
     navigate,
     dragIds,
+    data,
     keyActivate,
-    shop,
-    worker,
-    shopLabel,
-    tasksOf,
-    activeOf,
-    doneOf,
-    code,
     openModal,
     askDelete,
     undoDelete,
@@ -99,46 +98,44 @@ export function useVals(model: AppModel) {
     moveWorkers,
     save,
     field,
+    submitLogin,
+    logout,
   } = model
 
   const showCodes = SETTINGS.showTaskCodes !== false
   const defStatus = SETTINGS.defaultTaskStatus || 'Новая'
   const m = st.modal
-  const cur = shop(route.shopId)
-  const curW = worker(route.workerId)
-  const shopWorkers = st.workers.filter((w) => w.shopId === route.shopId)
+  const cur = data.workshops.find((s) => s.id === route.shopId)
+  const curW = data.worker
 
-  const taskRow = (t: Task): TaskRow => ({
-    title: t.title,
-    code: showCodes ? code(t) : '',
-    status: t.status,
-    color: COLORS[t.status],
-    worker: worker(t.workerId)?.name || '—',
-    shop: shopLabel(shop(worker(t.workerId)?.shopId ?? 0)),
-    edit: () =>
-      openModal({ kind: 'task', id: t.id, name: t.title, workerId: t.workerId, status: t.status }),
-    del: () => askDelete({ kind: 'task', id: t.id, label: t.title }),
-    sel: st.selT.indexOf(t.id) !== -1,
-    toggle: () => toggleSel('t', t.id),
-  })
+  const taskRow = (t: ApiTask): TaskRow => {
+    const status = STATUS_LABEL[t.status]
+    return {
+      title: t.title,
+      code: showCodes ? t.code : '',
+      status,
+      color: COLORS[status],
+      worker: t.worker_name,
+      shop: shopLabel(t.worker_workshop_number, t.worker_workshop_name),
+      edit: () =>
+        openModal({ kind: 'task', id: t.id, name: t.title, workerId: t.worker, status }),
+      del: () => askDelete({ kind: 'task', id: t.id, label: t.title }),
+      sel: st.selT.indexOf(t.id) !== -1,
+      toggle: () => toggleSel('t', t.id),
+    }
+  }
 
-  const workerRow = (w: Worker): WorkerRow => ({
+  const workerRow = (w: ApiWorker): WorkerRow => ({
     name: w.name,
-    shop: shopLabel(shop(w.shopId)),
-    active: activeOf(w.id),
-    done: doneOf(w.id),
-    total: tasksOf(w.id).length,
-    pct: Math.round((100 * activeOf(w.id)) / Math.max(1, tasksOf(w.id).length)) + '%',
-    bar: activeOf(w.id) === 0 ? 'var(--faint)' : activeOf(w.id) >= 4 ? 'var(--danger)' : 'var(--accent)',
-    load: tasksOf(w.id).length
-      ? Math.round((100 * doneOf(w.id)) / tasksOf(w.id).length) + '%'
-      : '0%',
-    chips: tasksOf(w.id)
-      .slice(0, 6)
-      .map((t) => ({ c: COLORS[t.status] })),
-    lastTask: tasksOf(w.id).slice(-1)[0]?.title || 'задач нет',
+    shop: shopLabel(w.workshop_number, w.workshop_name),
+    active: w.active_tasks,
+    done: w.done_tasks,
+    total: w.tasks_total,
+    bar:
+      w.active_tasks === 0 ? 'var(--faint)' : w.active_tasks >= 4 ? 'var(--danger)' : 'var(--accent)',
+    lastTask: w.last_task_title || 'задач нет',
     open: () => navigate('/workers/' + w.id),
-    edit: () => openModal({ kind: 'worker', id: w.id, name: w.name, shopId: w.shopId }),
+    edit: () => openModal({ kind: 'worker', id: w.id, name: w.name, shopId: w.workshop }),
     del: () => askDelete({ kind: 'worker', id: w.id, label: w.name }),
     sel: st.selW.indexOf(w.id) !== -1,
     toggle: () => toggleSel('w', w.id),
@@ -158,79 +155,29 @@ export function useVals(model: AppModel) {
     view === v || (v === 'shops' && (view === 'shop' || view === 'worker'))
   const navBg = (v: string) => (isActive(v) ? 'var(--accent)' : 'transparent')
   const navBar = (v: string) => (isActive(v) ? 'var(--accent)' : 'rgba(var(--paper-rgb),.28)')
-  const total = st.tasks.length || 1
-  const pct = (n: number) => Math.round((1000 * n) / total) / 10 + '%'
 
-  const q = st.q.trim().toLowerCase()
+  const counts = new Map((data.summary?.by_status ?? []).map((i) => [i.status, i.count]))
+  const countTasks = data.summary?.total ?? 0
+  const total = countTasks || 1
+  const pct = (n: number) => Math.round((1000 * n) / total) / 10 + '%'
+  const countNew = counts.get('new') ?? 0
+  const countInWork = counts.get('in_progress') ?? 0
+  const countDone = counts.get('done') ?? 0
+
   const arrow = (list: 'w' | 't', key: string) => {
     const sk = list === 'w' ? st.sortW : st.sortT
     const d = list === 'w' ? st.dirW : st.dirT
     return sk === key ? (d > 0 ? '↑' : '↓') : ''
   }
-  const cmp = (a: string | number, b: string | number) =>
-    typeof a === 'number' ? a - (b as number) : String(a).localeCompare(String(b), 'ru')
-  const lastOf = (w: Worker) => tasksOf(w.id).slice(-1)[0]?.title || ''
 
-  let fw = st.workers.filter(
-    (w) =>
-      (!st.fShop || w.shopId === Number(st.fShop)) &&
-      (!q || (w.name + ' ' + shopLabel(shop(w.shopId))).toLowerCase().indexOf(q) !== -1),
-  )
-  const wKey = (w: Worker) =>
-    st.sortW === 'shop'
-      ? shopLabel(shop(w.shopId))
-      : st.sortW === 'last'
-        ? lastOf(w)
-        : st.sortW === 'load'
-          ? activeOf(w.id)
-          : w.name
-  fw = fw.slice().sort((a, b) => st.dirW * cmp(wKey(a), wKey(b)))
-
-  let ft = st.tasks.filter((t) => {
-    const w = worker(t.workerId)
-    return (
-      (!st.fStatus || t.status === st.fStatus) &&
-      (!st.fWorker || t.workerId === Number(st.fWorker)) &&
-      (!st.fShop || w?.shopId === Number(st.fShop)) &&
-      (!q || (t.title + ' ' + code(t) + ' ' + (w?.name || '')).toLowerCase().indexOf(q) !== -1)
-    )
-  })
-  const tKey = (t: Task) => {
-    const w = worker(t.workerId)
-    return st.sortT === 'worker'
-      ? w?.name || ''
-      : st.sortT === 'shop'
-        ? shopLabel(shop(w?.shopId ?? 0))
-        : st.sortT === 'status'
-          ? STATUSES.indexOf(t.status)
-          : t.title
-  }
-  ft = ft.slice().sort((a, b) => st.dirT * cmp(tKey(a), tKey(b)))
-
-  const clamp = (page: number, len: number) => Math.min(page, Math.max(0, Math.ceil(len / PAGE) - 1))
-  const pw = clamp(st.pageW, fw.length)
-  const pt = clamp(st.pageT, ft.length)
-  const pagedW = fw.slice(pw * PAGE, pw * PAGE + PAGE)
-  const pagedT = ft.slice(pt * PAGE, pt * PAGE + PAGE)
-  const pageLabel = (len: number, page: number) =>
-    len === 0
-      ? '0'
-      : Math.min(len, clamp(page, len) * PAGE + 1) +
-        '–' +
-        Math.min(len, clamp(page, len) * PAGE + PAGE) +
-        ' из ' +
-        len
-
-  const qs = st.qShop.trim().toLowerCase()
-  const sKey = (w: Worker) =>
-    st.sortS === 'last' ? lastOf(w) : st.sortS === 'load' ? activeOf(w.id) : w.name
-  const shopList = shopWorkers
-    .filter((w) => !qs || (w.name + ' ' + lastOf(w)).toLowerCase().indexOf(qs) !== -1)
-    .slice()
-    .sort((a, b) => st.dirS * cmp(sKey(a), sKey(b)))
   const sArrow = (key: string) => (st.sortS === key ? (st.dirS > 0 ? '↑' : '↓') : '')
   const setSortS = (key: State['sortS']) =>
     setState({ sortS: key, dirS: st.sortS === key ? -st.dirS : 1 })
+
+  /** «13–24 из 57» по номеру страницы API и общему количеству. */
+  const pageLabel = (count: number, page: number) =>
+    count === 0 ? '0' : `${(page - 1) * PAGE + 1}–${Math.min(count, page * PAGE)} из ${count}`
+  const lastPage = (count: number) => Math.max(1, Math.ceil(count / PAGE))
 
   const nf = new Intl.NumberFormat('ru-RU')
   const shiftDate = new Intl.DateTimeFormat('ru-RU', {
@@ -243,10 +190,10 @@ export function useVals(model: AppModel) {
     theme: SETTINGS.darkTheme ? 'dark' : 'light',
     touch: SETTINGS.touchMode ? '1' : '0',
     shiftDate: shiftDate,
-    loading: st.loading,
-    notLoading: !st.loading,
-    errorOpen: !!st.error,
-    errorText: st.error || '',
+    loading: data.loading,
+    notLoading: !data.loading,
+    errorOpen: !!data.error,
+    errorText: data.error || '',
     retry: () => load(),
     offline: st.online === false,
     skeletonRows: [1, 2, 3, 4, 5, 6],
@@ -258,32 +205,19 @@ export function useVals(model: AppModel) {
     onSortKeyTWorker: keyActivate(() => setSort('t', 'worker')),
     onSortKeyTShop: keyActivate(() => setSort('t', 'shop')),
     onSortKeyTStatus: keyActivate(() => setSort('t', 'status')),
-    nWorkers: nf.format(st.workers.length),
-    nTasks: nf.format(st.tasks.length),
-    nShops: nf.format(st.shops.length),
-    notAuthed: !st.authed,
+    nWorkers: nf.format(data.workersCount),
+    nTasks: nf.format(countTasks),
+    nShops: nf.format(data.shopsCount),
+    notAuthed: !data.authed,
     login: st.login,
     pass: st.pass,
     authErr: st.authErr,
-    authBtn: st.authBusy ? 'Проверка…' : 'Войти',
+    authBtn: data.authBusy ? 'Проверка…' : 'Войти',
     setLogin: (e: ChangeEvent<HTMLInputElement>) =>
       setState({ login: e.target.value, authErr: '' }),
     setPass: (e: ChangeEvent<HTMLInputElement>) => setState({ pass: e.target.value, authErr: '' }),
-    submitLogin: (e: { preventDefault: () => void }) => {
-      e.preventDefault()
-      const l = st.login.trim()
-      const p = st.pass
-      if (!l || !p) return setState({ authErr: 'Заполните логин и пароль' })
-      setState({ authBusy: true })
-      setTimeout(() => {
-        if (l.toLowerCase() === 'master' && p === '1234') {
-          setState({ authed: true, authBusy: false, pass: '', authErr: '' })
-        } else {
-          setState({ authBusy: false, authErr: 'Неверный логин или пароль' })
-        }
-      }, 450)
-    },
-    logout: () => setState({ authed: false, pass: '', authErr: '' }),
+    submitLogin,
+    logout,
     isShops: view === 'shops',
     isShop: view === 'shop',
     isWorker: view === 'worker',
@@ -298,44 +232,43 @@ export function useVals(model: AppModel) {
     navShopsBar: navBar('shops'),
     navWorkersBar: navBar('workers'),
     navTasksBar: navBar('tasks'),
-    countShops: st.shops.length,
-    countWorkers: st.workers.length,
-    countTasks: st.tasks.length,
-    countInWork: st.tasks.filter((t) => t.status === 'В работе').length,
-    countNew: st.tasks.filter((t) => t.status === 'Новая').length,
-    countDone: st.tasks.filter((t) => t.status === 'Выполнено').length,
-    pctInWork: pct(st.tasks.filter((t) => t.status === 'В работе').length),
-    pctNew: pct(st.tasks.filter((t) => t.status === 'Новая').length),
-    pctDone: pct(st.tasks.filter((t) => t.status === 'Выполнено').length),
+    countShops: data.shopsCount,
+    countWorkers: data.workersCount,
+    countTasks,
+    countInWork,
+    countNew,
+    countDone,
+    pctInWork: pct(countInWork),
+    pctNew: pct(countNew),
+    pctDone: pct(countDone),
 
-    shopRows: st.shops.map((s): ShopRow => {
-      const ws = st.workers.filter((w) => w.shopId === s.id)
-      const acts = ws.map((w) => activeOf(w.id))
+    shopRows: data.workshops.map((s: Workshop): ShopRow => {
+      const acts = s.workers_load.map((w) => w.active_tasks)
       const max = Math.max(1, ...acts)
       return {
-        num: s.num,
+        num: s.number,
         name: s.name,
-        workers: ws.length,
-        active: acts.reduce((a, b) => a + b, 0),
-        done: ws.reduce((a, w) => a + doneOf(w.id), 0),
+        workers: s.workers_count,
+        active: s.active_tasks,
+        done: s.done_tasks,
         bars: acts.slice(0, 5).map((v) => ({
           h: Math.max(4, Math.round((26 * v) / max)) + 'px',
           c: v === max && v > 0 ? 'var(--accent)' : 'rgba(var(--accent-rgb),.35)',
         })),
         open: () => navigate('/shops/' + s.id),
-        edit: () => openModal({ kind: 'shop', id: s.id, name: s.name, num: s.num }),
-        del: () => askDelete({ kind: 'shop', id: s.id, label: shopLabel(s) }),
+        edit: () => openModal({ kind: 'shop', id: s.id, name: s.name, num: s.number }),
+        del: () => askDelete({ kind: 'shop', id: s.id, label: shopLabel(s.number, s.name) }),
       }
     }),
 
-    shopTitle: cur ? 'Цех №' + cur.num : 'Цех',
-    shopMeta: cur ? cur.name + ' · рабочих ' + shopWorkers.length : '',
-    shopWorkerRows: shopList.map(workerRow),
-    shopEmpty: shopWorkers.length === 0,
-    shopSearchEmpty: shopWorkers.length > 0 && shopList.length === 0,
+    shopTitle: cur ? 'Цех №' + cur.number : 'Цех',
+    shopMeta: cur ? cur.name + ' · рабочих ' + cur.workers_count : '',
+    shopWorkerRows: data.shopWorkers.map(workerRow),
+    shopEmpty: !st.qShop && data.shopWorkers.length === 0,
+    shopSearchEmpty: !!st.qShop && data.shopWorkers.length === 0,
     qShop: st.qShop,
     onQShop: (e: ChangeEvent<HTMLInputElement>) => setState({ qShop: e.target.value }),
-    shopFound: shopList.length,
+    shopFound: data.shopWorkers.length,
     sortSName: sArrow('name'),
     sortSLast: sArrow('last'),
     sortSLoad: sArrow('load'),
@@ -352,10 +285,10 @@ export function useVals(model: AppModel) {
     bulkDeleteWorkers: () => bulkDelete('w'),
     onBulkMoveShop: (e: ChangeEvent<HTMLSelectElement>) => {
       moveWorkers(st.selW, Number(e.target.value))
-      setState({ selW: [] })
+      e.target.value = ''
     },
     moveShopOptions: ([{ value: '', label: 'Перевести в цех…' }] as Option[]).concat(
-      st.shops.map((s) => ({ value: String(s.id), label: shopLabel(s) })),
+      data.workshops.map((s) => ({ value: String(s.id), label: shopLabel(s.number, s.name) })),
     ),
     selTCount: st.selT.length,
     selTOn: st.selT.length > 0,
@@ -368,10 +301,10 @@ export function useVals(model: AppModel) {
     bulkStatusOptions: ([{ value: '', label: 'Сменить статус…' }] as Option[]).concat(
       STATUSES.map((s) => ({ value: s, label: s })),
     ),
-    dropShops: st.shops.map(
+    dropShops: data.workshops.map(
       (s): DropShop => ({
-        label: shopLabel(s),
-        count: st.workers.filter((w) => w.shopId === s.id).length,
+        label: shopLabel(s.number, s.name),
+        count: s.workers_count,
         bg: st.dragOver === s.id ? 'var(--accent)' : 'transparent',
         fg: st.dragOver === s.id ? 'var(--on-accent)' : 'var(--muted-strong)',
         onDragOver: (e) => {
@@ -389,53 +322,51 @@ export function useVals(model: AppModel) {
             (n) => !isNaN(n),
           )
           moveWorkers(ids, s.id)
-          setState({ selW: [] })
         },
       }),
     ),
     editShop: () =>
-      cur && openModal({ kind: 'shop', id: cur.id, name: cur.name, num: cur.num }),
+      cur && openModal({ kind: 'shop', id: cur.id, name: cur.name, num: cur.number }),
     addShop: () => openModal({ kind: 'shop', name: '', num: '' }),
     addWorker: () => openModal({ kind: 'worker', name: '', shopId: route.shopId }),
-    addWorkerAny: () => openModal({ kind: 'worker', name: '', shopId: st.shops[0]?.id }),
+    addWorkerAny: () => openModal({ kind: 'worker', name: '', shopId: data.workshops[0]?.id }),
 
     workerName: curW ? curW.name : 'Рабочий',
-    workerShop: curW ? shopLabel(shop(curW.shopId)) : '—',
-    workerMeta: curW ? 'активных ' + activeOf(curW.id) + ' · выполнено ' + doneOf(curW.id) : '',
-    workerTaskRows: curW ? tasksOf(curW.id).map(taskRow) : [],
-    workerEmpty: curW ? tasksOf(curW.id).length === 0 : false,
-    backToShop: () => navigate(curW ? '/shops/' + curW.shopId : '/shops'),
+    workerShop: curW ? shopLabel(curW.workshop_number, curW.workshop_name) : '—',
+    workerMeta: curW ? 'активных ' + curW.active_tasks + ' · выполнено ' + curW.done_tasks : '',
+    workerTaskRows: data.workerTasks.map(taskRow),
+    workerEmpty: !!curW && data.workerTasks.length === 0,
+    backToShop: () => navigate(curW ? '/shops/' + curW.workshop : '/shops'),
     editWorker: () =>
-      curW && openModal({ kind: 'worker', id: curW.id, name: curW.name, shopId: curW.shopId }),
+      curW && openModal({ kind: 'worker', id: curW.id, name: curW.name, shopId: curW.workshop }),
     addTask: () =>
       openModal({ kind: 'task', name: '', workerId: route.workerId, status: defStatus }),
     addTaskAny: () =>
-      openModal({ kind: 'task', name: '', workerId: st.workers[0]?.id, status: defStatus }),
+      openModal({ kind: 'task', name: '', workerId: data.workersDict[0]?.id, status: defStatus }),
 
     q: st.q,
-    onQ: (e: ChangeEvent<HTMLInputElement>) =>
-      setState({ q: e.target.value, pageW: 0, pageT: 0 }),
+    onQ: (e: ChangeEvent<HTMLInputElement>) => setState({ q: e.target.value, pageW: 1, pageT: 1 }),
     fShopFilter: st.fShop,
     onShopFilter: (e: ChangeEvent<HTMLSelectElement>) =>
-      setState({ fShop: e.target.value, pageW: 0, pageT: 0 }),
+      setState({ fShop: e.target.value, pageW: 1, pageT: 1 }),
     fStatusFilter: st.fStatus,
     onStatusFilter: (e: ChangeEvent<HTMLSelectElement>) =>
-      setState({ fStatus: e.target.value, pageT: 0 }),
+      setState({ fStatus: e.target.value, pageT: 1 }),
     fWorkerFilter: st.fWorker,
     onWorkerFilter: (e: ChangeEvent<HTMLSelectElement>) =>
-      setState({ fWorker: e.target.value, pageT: 0 }),
+      setState({ fWorker: e.target.value, pageT: 1 }),
     shopFilterOptions: ([{ value: '', label: 'Все цеха' }] as Option[]).concat(
-      st.shops.map((s) => ({ value: String(s.id), label: 'Цех №' + s.num + ' · ' + s.name })),
+      data.workshops.map((s) => ({ value: String(s.id), label: shopLabel(s.number, s.name) })),
     ),
     statusFilterOptions: ([{ value: '', label: 'Все статусы' }] as Option[]).concat(
       STATUSES.map((s) => ({ value: s, label: s })),
     ),
     workerFilterOptions: ([{ value: '', label: 'Все рабочие' }] as Option[]).concat(
-      st.workers.map((w) => ({ value: String(w.id), label: w.name })),
+      data.workersDict.map((w) => ({ value: String(w.id), label: w.name })),
     ),
     filtersOn: !!(st.q || st.fShop || st.fStatus || st.fWorker),
     resetFilters: () =>
-      setState({ q: '', fShop: '', fStatus: '', fWorker: '', pageW: 0, pageT: 0 }),
+      setState({ q: '', fShop: '', fStatus: '', fWorker: '', pageW: 1, pageT: 1 }),
 
     sortWName: arrow('w', 'name'),
     sortWShop: arrow('w', 'shop'),
@@ -454,23 +385,22 @@ export function useVals(model: AppModel) {
     onSortTShop: () => setSort('t', 'shop'),
     onSortTStatus: () => setSort('t', 'status'),
 
-    allWorkerRows: pagedW.map(workerRow),
-    workersFound: fw.length,
-    workersEmpty: fw.length === 0,
-    workerPageLabel: pageLabel(fw.length, st.pageW),
-    workerPageOn: fw.length > PAGE,
-    prevWorkerPage: () => setState({ pageW: Math.max(0, st.pageW - 1) }),
+    allWorkerRows: data.workers.map(workerRow),
+    workersFound: data.workersFound,
+    workersEmpty: data.workersFound === 0,
+    workerPageLabel: pageLabel(data.workersFound, st.pageW),
+    workerPageOn: data.workersFound > PAGE,
+    prevWorkerPage: () => setState({ pageW: Math.max(1, st.pageW - 1) }),
     nextWorkerPage: () =>
-      setState({ pageW: Math.min(Math.ceil(fw.length / PAGE) - 1, st.pageW + 1) }),
+      setState({ pageW: Math.min(lastPage(data.workersFound), st.pageW + 1) }),
 
-    allTaskRows: pagedT.map(taskRow),
-    tasksFound: ft.length,
-    tasksEmptyAll: ft.length === 0,
-    taskPageLabel: pageLabel(ft.length, st.pageT),
-    taskPageOn: ft.length > PAGE,
-    prevTaskPage: () => setState({ pageT: Math.max(0, st.pageT - 1) }),
-    nextTaskPage: () =>
-      setState({ pageT: Math.min(Math.ceil(ft.length / PAGE) - 1, st.pageT + 1) }),
+    allTaskRows: data.tasks.map(taskRow),
+    tasksFound: data.tasksFound,
+    tasksEmptyAll: data.tasksFound === 0,
+    taskPageLabel: pageLabel(data.tasksFound, st.pageT),
+    taskPageOn: data.tasksFound > PAGE,
+    prevTaskPage: () => setState({ pageT: Math.max(1, st.pageT - 1) }),
+    nextTaskPage: () => setState({ pageT: Math.min(lastPage(data.tasksFound), st.pageT + 1) }),
 
     undoOpen: !!st.undo,
     undoText: st.undo ? st.undo.label : '',
@@ -503,16 +433,16 @@ export function useVals(model: AppModel) {
     showShop: !!m && m.kind === 'worker',
     fShop: m && m.shopId != null ? String(m.shopId) : '',
     onShop: field('shopId' as keyof Modal),
-    shopOptions: st.shops.map(
-      (s: Shop): Option => ({ value: String(s.id), label: 'Цех №' + s.num + ' — ' + s.name }),
+    shopOptions: data.workshops.map(
+      (s): Option => ({ value: String(s.id), label: 'Цех №' + s.number + ' — ' + s.name }),
     ),
     showWorkerSelect: !!m && m.kind === 'task',
     fWorker: m && m.workerId != null ? String(m.workerId) : '',
     onWorker: field('workerId' as keyof Modal),
-    workerOptions: st.workers.map(
-      (w: Worker): Option => ({
+    workerOptions: data.workersDict.map(
+      (w): Option => ({
         value: String(w.id),
-        label: w.name + ' · ' + shopLabel(shop(w.shopId)),
+        label: w.name + ' · ' + shopLabel(w.workshop_number, w.workshop_name),
       }),
     ),
     showStatus: !!m && m.kind === 'task',

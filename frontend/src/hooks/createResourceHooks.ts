@@ -46,20 +46,8 @@ export function createResourceHooks<T, TInput, TParams extends object>(
     })
   }
 
-  /**
-   * Инвалидация после мутации — по всему кэшу, а не по своему скоупу.
-   *
-   * Счётчики связаны: новая задача меняет загрузку рабочего и агрегаты цеха,
-   * удаление цеха каскадом гасит рабочих и задачи, restore поднимает всю партию.
-   * Точечная инвалидация оставила бы соседний список с прежними числами.
-   */
-  function useInvalidateAll() {
-    const queryClient = useQueryClient()
-    return () => queryClient.invalidateQueries()
-  }
-
   function useCreate() {
-    const invalidateAll = useInvalidateAll()
+    const invalidateAll = useInvalidateData()
 
     return useMutation({
       mutationFn: (payload: TInput) => resource.create(payload),
@@ -68,7 +56,7 @@ export function createResourceHooks<T, TInput, TParams extends object>(
   }
 
   function useUpdate() {
-    const invalidateAll = useInvalidateAll()
+    const invalidateAll = useInvalidateData()
 
     return useMutation({
       mutationFn: ({ id, payload }: { id: number; payload: Partial<TInput> }) =>
@@ -78,7 +66,7 @@ export function createResourceHooks<T, TInput, TParams extends object>(
   }
 
   function useRemove() {
-    const invalidateAll = useInvalidateAll()
+    const invalidateAll = useInvalidateData()
 
     return useMutation({
       mutationFn: (id: number) => resource.remove(id),
@@ -87,7 +75,7 @@ export function createResourceHooks<T, TInput, TParams extends object>(
   }
 
   function useBulkDelete() {
-    const invalidateAll = useInvalidateAll()
+    const invalidateAll = useInvalidateData()
 
     return useMutation({
       mutationFn: (payload: BulkIdsInput) => resource.bulkDelete(payload),
@@ -96,7 +84,7 @@ export function createResourceHooks<T, TInput, TParams extends object>(
   }
 
   function useRestore() {
-    const invalidateAll = useInvalidateAll()
+    const invalidateAll = useInvalidateData()
 
     return useMutation({
       mutationFn: (payload: BulkIdsInput) => resource.restore(payload),
@@ -105,6 +93,19 @@ export function createResourceHooks<T, TInput, TParams extends object>(
   }
 
   return { keys, useList, useDetail, useCreate, useUpdate, useRemove, useBulkDelete, useRestore }
+}
+
+/**
+ * Инвалидация после мутации — по всему кэшу данных, а не по своему скоупу.
+ *
+ * Счётчики связаны: новая задача меняет загрузку рабочего и агрегаты цеха,
+ * удаление цеха каскадом гасит рабочих и задачи, restore поднимает всю партию.
+ * Точечная инвалидация оставила бы соседний список с прежними числами.
+ * Сессия (scope 'auth') от мутаций не меняется, поэтому её не трогаем.
+ */
+export function useInvalidateData() {
+  const queryClient = useQueryClient()
+  return () => queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
 }
 
 /** Пустой ответ списка — удобно как значение по умолчанию, пока данные грузятся. */

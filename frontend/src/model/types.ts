@@ -1,27 +1,8 @@
-/** Типы состояния прототипа (порт state из класса DCLogic). */
+/** Типы состояния интерфейса (порт state из класса DCLogic). */
 
 export type Status = 'Новая' | 'В работе' | 'Выполнено'
 
 export type Kind = 'shop' | 'worker' | 'task'
-
-export interface Shop {
-  id: number
-  num: number
-  name: string
-}
-
-export interface Worker {
-  id: number
-  name: string
-  shopId: number
-}
-
-export interface Task {
-  id: number
-  title: string
-  workerId: number
-  status: Status
-}
 
 /** Черновик формы создания/редактирования: поля лежат вперемешку, как в оригинале. */
 export interface Modal {
@@ -41,13 +22,15 @@ export interface Confirm {
   label: string
 }
 
-/** Снимок данных для «Вернуть». path заменяет view/shopId/workerId оригинала. */
+/**
+ * Откат для тоста «Вернуть».
+ *
+ * Вместо снимка списков — обратное действие: restore для удаления, обратный
+ * перевод для смены цеха, прежние статусы для массовой смены.
+ */
 export interface Undo {
   label: string
-  shops: Shop[]
-  workers: Worker[]
-  tasks: Task[]
-  path: string
+  run: () => Promise<unknown>
 }
 
 export type SortW = 'name' | 'shop' | 'last' | 'load'
@@ -55,14 +38,11 @@ export type SortT = 'title' | 'worker' | 'shop' | 'status'
 export type SortS = 'name' | 'last' | 'load'
 
 export interface State {
-  authed: boolean
   login: string
   pass: string
   authErr: string
-  authBusy: boolean
   modal: Modal | null
   confirm: Confirm | null
-  seq: number
   q: string
   fShop: string
   fStatus: string
@@ -73,17 +53,15 @@ export interface State {
   sortS: SortS
   dirS: number
   dragOver: number | null
-  loading: boolean
-  error: string | null
+  /** Ошибка действия (сохранение, удаление) — в баннере, а не в модалке. */
+  actionErr: string | null
   online: boolean
   sortW: SortW
   dirW: number
   sortT: SortT
   dirT: number
+  /** Номера страниц API, с единицы. */
   pageW: number
   pageT: number
   undo: Undo | null
-  shops: Shop[]
-  workers: Worker[]
-  tasks: Task[]
 }
