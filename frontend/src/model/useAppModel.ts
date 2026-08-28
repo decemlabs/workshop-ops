@@ -11,13 +11,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 
 import { ApiError } from '@/api/client'
-import type { Task, TaskListParams, Worker, WorkerListParams, Workshop } from '@/api/types'
+import type { TaskListParams, WorkerListParams } from '@/api/types'
 import { isUnauthenticated, useLogin, useLogout, useMe } from '@/hooks/useAuth'
 import {
   useBulkDeleteTasks,
   useBulkTaskStatus,
   useCreateTask,
   useDeleteTask,
+  useRestoreTasks,
   useTasks,
   useTaskSummary,
   useUpdateTask,
@@ -27,6 +28,7 @@ import {
   useBulkMoveWorkers,
   useCreateWorker,
   useDeleteWorker,
+  useRestoreWorkers,
   useUpdateWorker,
   useWorker,
   useWorkers,
@@ -34,6 +36,7 @@ import {
 import {
   useCreateWorkshop,
   useDeleteWorkshop,
+  useRestoreWorkshops,
   useUpdateWorkshop,
   useWorkshops,
 } from '@/hooks/useWorkshops'
@@ -196,15 +199,18 @@ export function useAppModel() {
   const createWorkshop = useCreateWorkshop()
   const updateWorkshop = useUpdateWorkshop()
   const deleteWorkshop = useDeleteWorkshop()
+  const restoreWorkshops = useRestoreWorkshops()
   const createWorker = useCreateWorker()
   const updateWorker = useUpdateWorker()
   const deleteWorker = useDeleteWorker()
   const bulkDeleteWorkers = useBulkDeleteWorkers()
+  const restoreWorkers = useRestoreWorkers()
   const bulkMoveWorkers = useBulkMoveWorkers()
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
   const bulkDeleteTasks = useBulkDeleteTasks()
+  const restoreTasks = useRestoreTasks()
   const bulkTaskStatus = useBulkTaskStatus()
 
   /** Запросы текущего экрана: по ним считаются скелетон и баннер ошибки. */
@@ -226,6 +232,47 @@ export function useAppModel() {
 
     const openModal = (m: Modal) => setState({ modal: m })
 
+    /** Строки, уже пришедшие с сервера: из них берутся прежние значения для отката. */
+    const loadedWorkers = () =>
+      [workersPage.data, shopWorkers.data, workersDict.data].flatMap((page) => page?.results ?? [])
+    const loadedTasks = () =>
+      [tasksPage.data, workerTasks.data].flatMap((page) => page?.results ?? [])
+
+    const shopLabel = (id: number) => {
+      const s = workshops.data?.results.find((item) => item.id === id)
+      return s ? `Цех №${s.number} · ${s.name}` : 'цех'
+    }
+
+    /** Тост «Вернуть» на 9 секунд с обратным действием. */
+    const startUndo = (label: string, undo: () => Promise<unknown>) => {
+      if (undoTimer.current) clearTimeout(undoTimer.current)
+      undoTimer.current = setTimeout(() => setState({ undo: null }), 9000)
+      setState({ undo: { label, run: undo } })
+    }
+
+    /** Прежние значения выбранных строк, сгруппированные для обратной операции. */
+    const groupBefore = <T, R extends { id: number }>(
+      rows: R[],
+      ids: number[],
+      key: (row: R) => T,
+    ) => {
+      const groups = new Map<T, number[]>()
+      let found = 0
+
+      for (const id of ids) {
+        const row = rows.find((item) => item.id === id)
+        if (!row) continue
+
+        found += 1
+        const value = key(row)
+        groups.set(value, (groups.get(value) ?? []).concat([id]))
+      }
+
+      // Строки могли не попасть на экран (другая страница) — тогда откат неполный
+      // и тост не показываем, чтобы «Вернуть» не возвращало половину.
+      return found === ids.length ? groups : null
+    }
+
     /** Действие, ошибка которого уходит в баннер, а не ломает экран. */
     const run = async (fn: () => Promise<unknown>) => {
       try {
@@ -241,15 +288,18 @@ export function useAppModel() {
       return run(async () => {
         if (c.kind === 'shop') {
           await deleteWorkshop.mutateAsync(c.id)
+          startUndo(`Цех «${c.label}» удалён`, () => restoreWorkshops.mutateAsync({ ids: [c.id] }))
           if (view === 'shop' && route.shopId === c.id) navigate('/shops')
         } else if (c.kind === 'worker') {
           const shopId = workerDetail.data?.workshop
           await deleteWorker.mutateAsync(c.id)
+          startUndo(`Рабочий «${c.label}» удалён`, () => restoreWorkers.mutateAsync({ ids: [c.id] }))
           if (view === 'worker' && route.workerId === c.id) {
             navigate(shopId ? '/shops/' + shopId : '/shops')
           }
         } else {
           await deleteTask.mutateAsync(c.id)
+          startUndo(`Задача «${c.label}» удалена`, () => restoreTasks.mutateAsync({ ids: [c.id] }))
         }
       })
     }
@@ -296,9 +346,13 @@ export function useAppModel() {
         if (list === 'w') {
           await bulkDeleteWorkers.mutateAsync({ ids })
           setState({ selW: [] })
+          startUndo('Удалено рабочих: ' + ids.length, () =>
+            restoreWorkers.mutateAsync({ ids }),
+          )
         } else {
           await bulkDeleteTasks.mutateAsync({ ids })
           setState({ selT: [] })
+          startUndo('Удалено задач: ' + ids.length, () => restoreTasks.mutateAsync({ ids }))
         }
       })
     }
@@ -307,16 +361,43 @@ export function useAppModel() {
       const ids = st.selT
       if (!ids.length || !status) return
 
-      return run(() => bulkTaskStatus.mutateAsync({ ids, status: STATUS_CODE[status] }))
+      const before = groupBefore(loadedTasks(), ids, (t) => t.status)
+
+      return run(async () => {
+        await bulkTaskStatus.mutateAsync({ ids, status: STATUS_CODE[status] })
+        if (!before) return
+
+        // Прежние статусы возвращаем группами — по запросу на каждый статус.
+        startUndo('Статус изменён у задач: ' + ids.length, async () => {
+          for (const [was, group] of before) {
+            await bulkTaskStatus.mutateAsync({ ids: group, status: was })
+          }
+        })
+      })
     }
 
     const moveWorkers = (ids: number[], shopId: number) => {
       if (!ids.length || !shopId) return
 
+      const before = groupBefore(loadedWorkers(), ids, (w) => w.workshop)
+
       setState({ dragOver: null })
       return run(async () => {
         await bulkMoveWorkers.mutateAsync({ ids, workshop: shopId })
         setState({ selW: [] })
+        if (!before) return
+
+        const label =
+          ids.length === 1
+            ? 'Рабочий переведён в ' + shopLabel(shopId)
+            : 'Переведено рабочих: ' + ids.length
+
+        // Откат перевода — тот же bulk-move, но по прежним цехам.
+        startUndo(label, async () => {
+          for (const [workshop, group] of before) {
+            await bulkMoveWorkers.mutateAsync({ ids: group, workshop })
+          }
+        })
       })
     }
 
@@ -420,20 +501,29 @@ export function useAppModel() {
     route.shopId,
     route.workerId,
     workerDetail.data,
+    workshops.data,
+    workersDict.data,
+    workersPage.data,
+    shopWorkers.data,
+    workerTasks.data,
+    tasksPage.data,
     login,
     logoutMutation,
     createWorkshop,
     updateWorkshop,
     deleteWorkshop,
+    restoreWorkshops,
     createWorker,
     updateWorker,
     deleteWorker,
     bulkDeleteWorkers,
+    restoreWorkers,
     bulkMoveWorkers,
     createTask,
     updateTask,
     deleteTask,
     bulkDeleteTasks,
+    restoreTasks,
     bulkTaskStatus,
   ])
 
@@ -444,17 +534,17 @@ export function useAppModel() {
     // isLoading, а не isPending: выключенные до входа запросы «висят» в pending.
     loading: active.some((query) => query.isLoading),
     error: st.actionErr ?? (failed && !isUnauthenticated(failed.error) ? errorText(failed.error) : null),
-    workshops: (workshops.data?.results ?? []) as Workshop[],
+    workshops: (workshops.data?.results ?? []),
     shopsCount: workshops.data?.count ?? 0,
-    workersDict: (workersDict.data?.results ?? []) as Worker[],
+    workersDict: (workersDict.data?.results ?? []),
     workersCount: workersDict.data?.count ?? 0,
     summary: summary.data,
-    workers: (workersPage.data?.results ?? []) as Worker[],
+    workers: (workersPage.data?.results ?? []),
     workersFound: workersPage.data?.count ?? 0,
-    shopWorkers: (shopWorkers.data?.results ?? []) as Worker[],
+    shopWorkers: (shopWorkers.data?.results ?? []),
     worker: workerDetail.data,
-    workerTasks: (workerTasks.data?.results ?? []) as Task[],
-    tasks: (tasksPage.data?.results ?? []) as Task[],
+    workerTasks: (workerTasks.data?.results ?? []),
+    tasks: (tasksPage.data?.results ?? []),
     tasksFound: tasksPage.data?.count ?? 0,
   }
 
