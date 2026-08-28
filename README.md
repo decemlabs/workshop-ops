@@ -144,3 +144,21 @@ cd backend && uv run pytest
 ```bash
 cd frontend && bun run test && bun run typecheck && bun run lint
 ```
+
+Браузерные тесты (`e2e/`) идут в поднятую связку и проверяют её целиком — вход,
+создание цеха, массовые действия с откатом, пагинацию. Перед первым запуском
+ставится Chromium, это ~150 МБ:
+
+```bash
+make e2e-install
+```
+
+```bash
+make e2e
+```
+
+Прогон идёт в видимом окне браузера. Без экрана — например, по ssh:
+
+```bash
+E2E_HEADLESS=1 make e2e
+```

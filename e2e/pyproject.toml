@@ -1,0 +1,26 @@
+[project]
+name = "workshop-ops-e2e"
+version = "0.1.0"
+description = "Браузерные тесты собранной связки"
+requires-python = ">=3.14"
+dependencies = [
+    "pytest>=9.1.1",
+    "pytest-playwright>=0.7.1",
+    "requests>=2.32.5",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tracing retain-on-failure --screenshot only-on-failure"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "single"

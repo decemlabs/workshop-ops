@@ -4,10 +4,10 @@ COMPOSE_PROD = docker compose -f compose.prod.yaml
 
 .DEFAULT_GOAL = help
 
-.PHONY: help install db migrate back front test test-back test-front lint typecheck check up down logs superuser clean
+.PHONY: help install db migrate back front test test-back test-front lint typecheck check e2e e2e-install up down logs superuser clean
 
 help: ## показать этот список
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-11s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-11s %s\n", $$1, $$2}'
 
 # --- разработка ---
 
@@ -39,12 +39,20 @@ test-front: ## vitest
 
 lint: ## ruff и eslint
 	cd backend && uv run ruff check src
+	cd e2e && uv run ruff check .
 	cd frontend && bun run lint
 
 typecheck: ## tsc
 	cd frontend && bun run typecheck
 
 check: lint typecheck test ## линтеры, типы и тесты — как перед коммитом
+
+e2e-install: ## поставить браузер для e2e (один раз, ~150 МБ)
+	cd e2e && uv sync && uv run playwright install chromium
+
+e2e: ## поднять связку и прогнать браузерные тесты
+	$(COMPOSE_PROD) up -d --build
+	cd e2e && uv run pytest
 
 # --- прод-связка ---
 
