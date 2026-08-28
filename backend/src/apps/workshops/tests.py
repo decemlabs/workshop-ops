@@ -577,3 +577,28 @@ def test_task_list_does_not_scale_queries_with_rows(api, shift):
         api.get('/api/tasks/')
 
     assert len(after) == len(before)
+
+
+def test_restore_lifts_workshop_deleted_by_another_batch(api, shift):
+    """Рабочего вернули после удаления цеха - цех поднимается вместе с ним"""
+    api.post('/api/workers/bulk-delete/', {'ids': [shift['ivanov'].pk]})
+    api.delete(f'/api/workshops/{shift["hot"].pk}/')
+
+    api.post('/api/workers/restore/', {'ids': [shift['ivanov'].pk]})
+
+    assert Worker.objects.get(pk=shift['ivanov'].pk).is_active
+    assert Workshop.objects.get(pk=shift['hot'].pk).is_active
+    assert api.get(f'/api/workshops/{shift["hot"].pk}/').status_code == 200
+
+
+def test_restore_task_lifts_its_worker(api, shift):
+    task = Task.objects.filter(worker=shift['ivanov']).first()
+    api.post('/api/tasks/bulk-delete/', {'ids': [task.pk]})
+    api.post('/api/workers/bulk-delete/', {'ids': [shift['ivanov'].pk]})
+
+    api.post('/api/tasks/restore/', {'ids': [task.pk]})
+
+    assert Task.objects.get(pk=task.pk).is_active
+    assert Worker.objects.get(pk=shift['ivanov'].pk).is_active
+    # Остальные задачи рабочего остаются в своей партии.
+    assert Task.objects.filter(worker=shift['ivanov'], is_active=True).count() == 1

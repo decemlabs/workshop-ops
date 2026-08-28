@@ -83,11 +83,29 @@ class SoftDeleteMixin:
             return Response({'updated': 0})
 
         with transaction.atomic():
+            task_ids = set(
+                Task.objects.filter(deleted_batch__in=batches).values_list('pk', flat=True)
+            )
+            worker_ids = set(
+                Worker.objects.filter(deleted_batch__in=batches).values_list('pk', flat=True)
+            )
+            workshop_ids = set(
+                Workshop.objects.filter(deleted_batch__in=batches).values_list('pk', flat=True)
+            )
+
+            worker_ids |= set(
+                Task.objects.filter(pk__in=task_ids).values_list('worker_id', flat=True)
+            )
+            workshop_ids |= set(
+                Worker.objects.filter(pk__in=worker_ids).values_list('workshop_id', flat=True)
+            )
+
+            # Порядок сверху вниз: цех, рабочие, задачи
             updated = sum(
-                model.objects.filter(deleted_batch__in=batches).update(
+                model.objects.filter(pk__in=ids, is_active=False).update(
                     is_active=True, deleted_batch=None
                 )
-                for model in (Workshop, Worker, Task)
+                for model, ids in ((Workshop, workshop_ids), (Worker, worker_ids), (Task, task_ids))
             )
 
         return Response({'updated': updated})
