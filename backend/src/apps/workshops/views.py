@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Task, Worker, Workshop
-from .querysets import with_worker_stats, with_workshop_stats
+from .querysets import with_worker_stats, with_workshop_stats, workers_for_card
 from .serializers import (
     BulkIdsSerializer,
     BulkMoveSerializer,
@@ -140,10 +140,7 @@ class WorkshopViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet)
         # Prefetch иначе на список
         # цехов уходит по запросу на карточку.
         return with_workshop_stats(super().get_queryset()).prefetch_related(
-            Prefetch(
-                'workers',
-                queryset=with_worker_stats(Worker.objects.filter(is_active=True)),
-            )
+            Prefetch('workers', queryset=workers_for_card())
         )
 
     def cascade(self, queryset, batch):

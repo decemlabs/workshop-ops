@@ -634,3 +634,21 @@ def test_restore_reports_number_taken_by_another_workshop(api, shift):
     assert response.status_code == 400
     assert response.json()['ids'] == 'Номера заняты действующими цехами: [10].'
     assert not Workshop.objects.get(pk=shift['hot'].pk).is_active
+
+
+def test_workshop_card_carries_only_five_workers(api, shift):
+    """Столбиков на карточке пять - остальных рабочих в ответе быть не должно"""
+    for i in range(8):
+        Worker.objects.create(name=f'Рабочий {i}', workshop=shift['hot'])
+
+    row = next(s for s in api.get('/api/workshops/').json()['results'] if s['number'] == 10)
+
+    assert row['workers_count'] == 9  # счётчик считает всех
+    assert len(row['workers_load']) == 5
+    assert [w['name'] for w in row['workers_load']] == [
+        'Иванов',
+        'Рабочий 0',
+        'Рабочий 1',
+        'Рабочий 2',
+        'Рабочий 3',
+    ]

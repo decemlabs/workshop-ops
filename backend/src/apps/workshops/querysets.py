@@ -1,9 +1,12 @@
-from django.db.models import Count, IntegerField, OuterRef, Q, QuerySet, Subquery
-from django.db.models.functions import Coalesce
+from django.db.models import Count, F, IntegerField, OuterRef, Q, QuerySet, Subquery, Window
+from django.db.models.functions import Coalesce, RowNumber
 
-from .models import Task
+from .models import Task, Worker
 
 ACTIVE_TASK = Q(tasks__is_active=True)
+
+#: Сколько столбиков загрузки помещается на карточку цеха.
+WORKSHOP_CARD_WORKERS = 5
 
 
 def _keep_default_ordering(queryset: QuerySet) -> QuerySet:
@@ -25,6 +28,25 @@ def with_worker_stats(queryset: QuerySet) -> QuerySet:
             done_tasks=Count('tasks', filter=ACTIVE_TASK & Q(tasks__status=Task.Status.DONE)),
             last_task_title=Subquery(last_task),
         )
+    )
+
+
+def workers_for_card(limit: int = WORKSHOP_CARD_WORKERS) -> QuerySet:
+    """Рабочие для столбиков карточки цеха: с каждого цеха только первые.
+
+    На карточке рисуются пять столбиков, поэтому тянуть всех рабочих цеха
+    незачем: ROW_NUMBER отрезает лишних в самом запросе.
+    """
+    return (
+        with_worker_stats(Worker.objects.filter(is_active=True))
+        .annotate(
+            position=Window(
+                expression=RowNumber(),
+                partition_by='workshop',
+                order_by=F('name').asc(),
+            )
+        )
+        .filter(position__lte=limit)
     )
 
 
