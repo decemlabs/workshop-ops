@@ -16,7 +16,9 @@ bun run dev        # http://localhost:5173, вход master / 1234
 Благодаря прокси браузер видит фронт и бэк как один origin: не нужны ни CORS,
 ни `CSRF_TRUSTED_ORIGINS`.
 
-Скрипты: `dev`, `build`, `preview`, `typecheck`, `lint`.
+Скрипты: `dev`, `build`, `preview`, `typecheck`, `lint`, `test`.
+
+`bun run test` — Vitest в jsdom, бэкенд не нужен: `fetch` замокан целиком.
 
 ## Структура
 
@@ -35,6 +37,7 @@ src/
     context.ts      useV() — доступ к значениям из компонентов
   ui/               по компоненту на каждый sc-if блок шаблона
   api/, hooks/      слой REST + react-query, для следующего этапа
+  test/             setup Vitest и mockFetch() — подмена fetch по путям
 ```
 
 Алиас `@/` указывает на `src/` (настроен в `vite.config.ts` и `tsconfig.app.json`).

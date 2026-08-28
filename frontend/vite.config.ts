@@ -1,7 +1,8 @@
 import { fileURLToPath } from 'node:url'
 
 import react from '@vitejs/plugin-react'
-import { defineConfig, loadEnv } from 'vite'
+import { loadEnv } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 // Дев-сервер проксирует API на Django: фронт и бэк для браузера остаются
 // одним origin, поэтому не нужны ни CORS, ни настройка CSRF_TRUSTED_ORIGINS,
@@ -29,6 +30,14 @@ export default defineConfig(({ mode }) => {
         '/admin': { target: backend },
         '/static': { target: backend },
       },
+    },
+    test: {
+      environment: 'jsdom',
+      // Без глобалей: describe/it/expect импортируются явно, как остальные модули.
+      globals: false,
+      setupFiles: ['./src/test/setup.ts'],
+      restoreMocks: true,
+      unstubGlobals: true,
     },
   }
 })
