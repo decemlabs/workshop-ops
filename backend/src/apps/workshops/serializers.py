@@ -66,6 +66,11 @@ class WorkerSerializer(serializers.ModelSerializer):
 
 class TaskSerializer(serializers.ModelSerializer):
     worker_name = serializers.CharField(source='worker.name', read_only=True)
+    worker_workshop = serializers.IntegerField(source='worker.workshop_id', read_only=True)
+    worker_workshop_name = serializers.CharField(source='worker.workshop.name', read_only=True)
+    worker_workshop_number = serializers.IntegerField(
+        source='worker.workshop.number', read_only=True
+    )
 
     class Meta:
         model = Task
@@ -75,6 +80,9 @@ class TaskSerializer(serializers.ModelSerializer):
             'title',
             'worker',
             'worker_name',
+            'worker_workshop',
+            'worker_workshop_name',
+            'worker_workshop_number',
             'status',
             'created_at',
             'updated_at',

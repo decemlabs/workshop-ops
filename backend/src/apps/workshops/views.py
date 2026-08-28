@@ -169,7 +169,7 @@ class WorkerViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
 
 
 class TaskViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
-    queryset = Task.objects.select_related('worker')
+    queryset = Task.objects.select_related('worker__workshop')
     serializer_class = TaskSerializer
     filterset_fields = ['status', 'worker', 'worker__workshop']
     search_fields = ['title', 'worker__name', 'code']

@@ -555,3 +555,25 @@ def test_ordering_tasks_by_workshop_number(api, shift):
     rows = api.get('/api/tasks/?ordering=worker__workshop__number&page_size=1').json()['results']
 
     assert rows[0]['worker_name'] == 'Иванов'
+
+
+def test_task_carries_workshop_of_its_worker(api, shift):
+    row = api.get(f'/api/tasks/?worker={shift["petrov"].pk}&page_size=1').json()['results'][0]
+
+    assert row['worker_workshop'] == shift['cold'].pk
+    assert row['worker_workshop_name'] == 'Покрасочный'
+    assert row['worker_workshop_number'] == 20
+
+
+def test_task_list_does_not_scale_queries_with_rows(api, shift):
+    """select_related('worker__workshop'): цех не должен стоить запроса на строку"""
+    with CaptureQueriesContext(connection) as before:
+        api.get('/api/tasks/')
+
+    for extra in range(5):
+        Task.objects.create(title=f'Ещё {extra}', worker=shift['ivanov'])
+
+    with CaptureQueriesContext(connection) as after:
+        api.get('/api/tasks/')
+
+    assert len(after) == len(before)
