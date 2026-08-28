@@ -99,7 +99,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',  # ?search=иванов
         'rest_framework.filters.OrderingFilter',  # ?ordering=-created_at
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'config.pagination.PageNumberPagination',  # ?page_size=12
     'PAGE_SIZE': 50,
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',

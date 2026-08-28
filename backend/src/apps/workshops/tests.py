@@ -516,3 +516,42 @@ def test_bulk_operation_rolls_back_on_unknown_id(api, shift):
 
 def test_bulk_rejects_empty_ids(api, shift):
     assert api.post('/api/workers/bulk-delete/', {'ids': []}).status_code == 400
+
+
+def test_page_size_is_requested_by_client(api, shift):
+    for extra in range(20):
+        Workshop.objects.create(number=100 + extra, name=f'Цех {extra}')
+
+    body = api.get('/api/workshops/?page_size=12').json()
+
+    assert len(body['results']) == 12
+    assert body['count'] == 22
+    assert body['next'] is not None
+
+
+def test_page_size_is_capped(api, shift):
+    assert api.get('/api/workshops/?page_size=1000').status_code == 200
+
+
+def test_ordering_workers_by_load(api, shift):
+    names = [w['name'] for w in api.get('/api/workers/?ordering=-active_tasks').json()['results']]
+
+    assert names == ['Иванов', 'Петров']
+
+
+def test_ordering_workers_by_workshop_number(api, shift):
+    rows = api.get('/api/workers/?ordering=-workshop__number').json()['results']
+
+    assert [w['workshop_number'] for w in rows] == [20, 10]
+
+
+def test_ordering_tasks_by_status_follows_lifecycle(api, shift):
+    statuses = [t['status'] for t in api.get('/api/tasks/?ordering=status_order').json()['results']]
+
+    assert statuses == sorted(statuses, key=['new', 'in_progress', 'done'].index)
+
+
+def test_ordering_tasks_by_workshop_number(api, shift):
+    rows = api.get('/api/tasks/?ordering=worker__workshop__number&page_size=1').json()['results']
+
+    assert rows[0]['worker_name'] == 'Иванов'

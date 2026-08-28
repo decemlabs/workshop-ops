@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 
 from django.db import transaction
-from django.db.models import Count, Prefetch, QuerySet
+from django.db.models import Case, Count, IntegerField, Prefetch, QuerySet, When
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -98,7 +98,14 @@ class WorkshopViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet)
     serializer_class = WorkshopSerializer
     filterset_fields = ['number']
     search_fields = ['name']
-    ordering_fields = ['number', 'name', 'created_at']
+    ordering_fields = [
+        'number',
+        'name',
+        'created_at',
+        'workers_count',
+        'active_tasks',
+        'done_tasks',
+    ]
 
     def get_queryset(self):
         # Prefetch иначе на список
@@ -129,7 +136,16 @@ class WorkerViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
     serializer_class = WorkerSerializer
     filterset_fields = ['workshop']
     search_fields = ['name']
-    ordering_fields = ['name', 'created_at']
+    ordering_fields = [
+        'name',
+        'created_at',
+        'workshop__name',
+        'workshop__number',
+        'tasks_total',
+        'active_tasks',
+        'done_tasks',
+        'last_task_title',
+    ]
 
     def get_queryset(self):
         return with_worker_stats(super().get_queryset())
@@ -157,7 +173,29 @@ class TaskViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     filterset_fields = ['status', 'worker', 'worker__workshop']
     search_fields = ['title', 'worker__name', 'code']
-    ordering_fields = ['created_at', 'updated_at', 'title', 'code']
+    ordering_fields = [
+        'created_at',
+        'updated_at',
+        'title',
+        'code',
+        'status_order',
+        'worker__name',
+        'worker__workshop__name',
+        'worker__workshop__number',
+    ]
+
+    def get_queryset(self):
+        # По самому status сортировка алфавитная: done, in_progress, new.
+        return (
+            super()
+            .get_queryset()
+            .annotate(
+                status_order=Case(
+                    *[When(status=value, then=i) for i, value in enumerate(Task.Status.values)],
+                    output_field=IntegerField(),
+                )
+            )
+        )
 
     @action(detail=False, methods=['post'], url_path='bulk-status')
     def bulk_status(self, request):
