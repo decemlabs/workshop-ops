@@ -17,7 +17,7 @@ export function ShopView() {
           <button onClick={v.addWorker} {...dc("font:600 12px 'IBM Plex Sans',sans-serif;padding:8px 14px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer;transition:background .12s,border-color .12s,transform .06s", { hover: 'background:var(--accent-dark);border-color:var(--accent-dark)', active: 'transform:translateY(1px)' })}>+ Добавить рабочего</button>
         </div>
       </div>
-      <div style={s('display:flex;align-items:center;gap:8px;padding:0 22px 12px')}>
+      <div style={s('display:flex;align-items:center;gap:8px;padding:12px 22px;border-bottom:1px solid rgba(var(--ink-rgb),.12)')}>
         <input value={v.qShop} onChange={v.onQShop} type="search" aria-label="Поиск по рабочим цеха" placeholder="Поиск по рабочим цеха" style={s("flex:1;max-width:320px;height:36px;font:400 13px/1.2 'IBM Plex Sans',sans-serif;padding:0 11px;border:1px solid rgba(var(--ink-rgb),.4);background:var(--field);color:var(--ink)")} />
         <div style={s("margin-left:auto;white-space:nowrap;font:400 11.5px 'IBM Plex Mono',monospace;color:var(--muted)")}>найдено {v.shopFound}</div>
       </div>
