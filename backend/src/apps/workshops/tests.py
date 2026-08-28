@@ -15,7 +15,7 @@ pytest-django позволяет использовать функции с фи
 
 @pytest.fixture
 def workshop(db):
-    return Workshop.objects.create(name='Сборочный')
+    return Workshop.objects.create(number=10, name='Сборочный')
 
 
 @pytest.fixture
@@ -162,8 +162,8 @@ def test_api_serialises_timestamps(api, workshop):
 @pytest.fixture
 def shift(db):
     """Смена как на макете сводки: 5 в работе, 2 новых, 4 выполненных."""
-    hot = Workshop.objects.create(name='Сборочный')
-    cold = Workshop.objects.create(name='Покрасочный')
+    hot = Workshop.objects.create(number=10, name='Сборочный')
+    cold = Workshop.objects.create(number=20, name='Покрасочный')
     ivanov = Worker.objects.create(name='Иванов', workshop=hot)
     petrov = Worker.objects.create(name='Петров', workshop=cold)
 
@@ -237,3 +237,27 @@ def test_summary_labels_match_design(api, shift):
         'in_progress': 'В работе',
         'done': 'Выполнено',
     }
+
+
+def test_api_serialises_workshop_number(api, workshop):
+    assert api.get('/api/workshops/').json()['results'][0]['number'] == 10
+
+
+def test_api_rejects_duplicate_workshop_number(api, workshop):
+    response = api.post('/api/workshops/', {'number': 10, 'name': 'Ещё один'})
+
+    assert response.status_code == 400
+    assert 'number' in response.json()
+
+
+def test_api_filters_workshops_by_number(api, shift):
+    response = api.get('/api/workshops/?number=20')
+
+    assert response.json()['count'] == 1
+    assert response.json()['results'][0]['name'] == 'Покрасочный'
+
+
+def test_api_orders_workshops_by_number(api, shift):
+    numbers = [w['number'] for w in api.get('/api/workshops/?ordering=-number').json()['results']]
+
+    assert numbers == [20, 10]

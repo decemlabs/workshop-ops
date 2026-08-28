@@ -11,16 +11,17 @@ class TimestampedModel(models.Model):
 
 
 class Workshop(TimestampedModel):
+    number = models.PositiveIntegerField('номер', unique=True)
     name = models.CharField(max_length=100)
     is_active = models.BooleanField('работает', default=True)
 
     class Meta(TimestampedModel.Meta):
         verbose_name = 'цех'
         verbose_name_plural = 'цеха'
-        ordering = ['name']
+        ordering = ['number']
 
     def __str__(self) -> str:
-        return self.name
+        return f'Цех №{self.number} · {self.name}'
 
 
 class Worker(TimestampedModel):

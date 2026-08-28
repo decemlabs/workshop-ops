@@ -6,13 +6,12 @@ from .models import Task, Worker, Workshop
 @admin.register(Workshop)
 class WorkshopAdmin(admin.ModelAdmin):
     # Колонки в списке объектов.
-    list_display = ['name', 'is_active']
+    list_display = ['number', 'name', 'is_active']
 
     # Панель фильтров справа.
     list_filter = ['is_active']
 
-    # Поле поиска над списком.
-    search_fields = ['name']
+    search_fields = ['name', '=number']
     readonly_fields = ['created_at', 'updated_at']
 
 

@@ -24,8 +24,9 @@ class ActiveFilterMixin:
 class WorkshopViewSet(ActiveFilterMixin, viewsets.ModelViewSet):
     queryset = Workshop.objects.all()
     serializer_class = WorkshopSerializer
+    filterset_fields = ['number']
     search_fields = ['name']
-    ordering_fields = ['name', 'created_at']
+    ordering_fields = ['number', 'name', 'created_at']
 
 
 class WorkerViewSet(ActiveFilterMixin, viewsets.ModelViewSet):

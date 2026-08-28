@@ -6,7 +6,7 @@ from .models import Task, Worker, Workshop
 class WorkshopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Workshop
-        fields = ['id', 'name', 'is_active', 'created_at', 'updated_at']
+        fields = ['id', 'number', 'name', 'is_active', 'created_at', 'updated_at']
 
 
 class WorkerSerializer(serializers.ModelSerializer):
