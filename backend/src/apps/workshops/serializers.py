@@ -31,7 +31,17 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['id', 'title', 'worker', 'worker_name', 'status', 'created_at', 'updated_at']
+        fields = [
+            'id',
+            'code',
+            'title',
+            'worker',
+            'worker_name',
+            'status',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['code']
 
     def validate_worker(self, worker: Worker) -> Worker:
         if not worker.is_active:

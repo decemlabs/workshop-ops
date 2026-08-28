@@ -1,6 +1,8 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.db.models import ProtectedError
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
 from apps.users.models import User
@@ -261,3 +263,40 @@ def test_api_orders_workshops_by_number(api, shift):
     numbers = [w['number'] for w in api.get('/api/workshops/?ordering=-number').json()['results']]
 
     assert numbers == [20, 10]
+
+
+def test_task_code_is_generated_on_create(worker):
+    task = Task.objects.create(title='Собрать раму', worker=worker)
+
+    assert task.code == f'ЗН-{4800 + task.pk}'
+
+
+def test_task_code_survives_updates(worker):
+    task = Task.objects.create(title='Собрать раму', worker=worker)
+    code = task.code
+
+    task.status = Task.Status.DONE
+    task.save()
+    task.refresh_from_db()
+
+    assert task.code == code
+
+
+def test_task_code_does_not_bump_updated_at(worker):
+    with CaptureQueriesContext(connection) as queries:
+        Task.objects.create(title='Собрать раму', worker=worker)
+
+    updates = [q['sql'] for q in queries.captured_queries if q['sql'].startswith('UPDATE')]
+
+    assert len(updates) == 1
+    assert 'updated_at' not in updates[0]
+
+
+def test_api_searches_tasks_by_code(api, worker):
+    task = Task.objects.create(title='Собрать раму', worker=worker)
+    Task.objects.create(title='Заменить фильтр', worker=worker)
+
+    response = api.get(f'/api/tasks/?search={task.code}')
+
+    assert response.json()['count'] == 1
+    assert response.json()['results'][0]['code'] == task.code

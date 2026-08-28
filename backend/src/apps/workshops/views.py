@@ -41,8 +41,8 @@ class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.select_related('worker')
     serializer_class = TaskSerializer
     filterset_fields = ['status', 'worker', 'worker__workshop']
-    search_fields = ['title', 'worker__name']
-    ordering_fields = ['created_at', 'updated_at', 'title']
+    search_fields = ['title', 'worker__name', 'code']
+    ordering_fields = ['created_at', 'updated_at', 'title', 'code']
 
     @action(detail=False)
     def summary(self, request):

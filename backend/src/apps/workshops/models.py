@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 
 class TimestampedModel(models.Model):
@@ -44,6 +44,10 @@ class Task(TimestampedModel):
         IN_PROGRESS = 'in_progress', 'В работе'
         DONE = 'done', 'Выполнено'
 
+    CODE_PREFIX = 'ЗН-'
+    CODE_OFFSET = 4800
+
+    code = models.CharField('код', max_length=20, unique=True, blank=True)
     title = models.CharField(max_length=100)
     worker = models.ForeignKey(Worker, on_delete=models.PROTECT, related_name='tasks')
     status = models.CharField('статус', max_length=20, choices=Status.choices, default=Status.NEW)
@@ -54,7 +58,16 @@ class Task(TimestampedModel):
         ordering = ['-created_at']
 
     def __str__(self) -> str:
-        return self.title
+        return f'{self.code} {self.title}' if self.code else self.title
+
+    def save(self, *args, **kwargs) -> None:
+        if self.code:
+            return super().save(*args, **kwargs)
+
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            self.code = f'{self.CODE_PREFIX}{self.CODE_OFFSET + self.pk}'
+            super().save(update_fields=['code'])
 
     def clean(self) -> None:
         """Не даёт завести задачу на выведенного из штата рабочего.
