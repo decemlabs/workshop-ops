@@ -300,3 +300,69 @@ def test_api_searches_tasks_by_code(api, worker):
 
     assert response.json()['count'] == 1
     assert response.json()['results'][0]['code'] == task.code
+
+
+def test_api_delete_workshop_soft_deletes_cascade(api, shift):
+    response = api.delete(f'/api/workshops/{shift["hot"].pk}/')
+
+    assert response.status_code == 204
+    assert not Workshop.objects.get(pk=shift['hot'].pk).is_active
+    assert not Worker.objects.get(pk=shift['ivanov'].pk).is_active
+    assert Task.objects.filter(worker=shift['ivanov'], is_active=True).count() == 0
+    # Соседний цех не задет.
+    assert Worker.objects.get(pk=shift['petrov'].pk).is_active
+
+
+def test_soft_delete_marks_everything_with_one_batch(api, shift):
+    api.delete(f'/api/workshops/{shift["hot"].pk}/')
+
+    batches = {Workshop.objects.get(pk=shift['hot'].pk).deleted_batch}
+    batches |= {Worker.objects.get(pk=shift['ivanov'].pk).deleted_batch}
+    batches |= set(
+        Task.objects.filter(worker=shift['ivanov']).values_list('deleted_batch', flat=True)
+    )
+
+    assert len(batches) == 1
+    assert None not in batches
+
+
+def test_restore_brings_back_the_whole_batch(api, shift):
+    api.delete(f'/api/workshops/{shift["hot"].pk}/')
+
+    response = api.post('/api/workshops/restore/', {'ids': [shift['hot'].pk]})
+
+    assert response.status_code == 200
+    assert response.json()['updated'] == 9  # цех + рабочий + 7 задач
+    assert Workshop.objects.get(pk=shift['hot'].pk).is_active
+    assert Worker.objects.get(pk=shift['ivanov'].pk).is_active
+    assert Task.objects.filter(worker=shift['ivanov'], is_active=True).count() == 7
+    assert Workshop.objects.get(pk=shift['hot'].pk).deleted_batch is None
+
+
+def test_restore_does_not_revive_earlier_deactivations(api, shift):
+    """Рабочий, выведенный из штата до удаления цеха, при откате не воскресает."""
+    ivanov = shift['ivanov']
+    ivanov.is_active = False
+    ivanov.save()
+
+    api.delete(f'/api/workshops/{shift["hot"].pk}/')
+    api.post('/api/workshops/restore/', {'ids': [shift['hot'].pk]})
+
+    assert Workshop.objects.get(pk=shift['hot'].pk).is_active
+    assert not Worker.objects.get(pk=ivanov.pk).is_active
+
+
+def test_restore_rejects_unknown_id(api, workshop):
+    response = api.post('/api/workshops/restore/', {'ids': [workshop.pk, 9999]})
+
+    assert response.status_code == 400
+    assert 'ids' in response.json()
+
+
+def test_api_hides_deactivated_tasks_by_default(api, worker):
+    task = Task.objects.create(title='Собрать раму', worker=worker)
+
+    api.delete(f'/api/tasks/{task.pk}/')
+
+    assert api.get('/api/tasks/').json()['count'] == 0
+    assert api.get('/api/tasks/?is_active=all').json()['count'] == 1

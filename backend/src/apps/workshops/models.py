@@ -10,12 +10,19 @@ class TimestampedModel(models.Model):
         abstract = True
 
 
-class Workshop(TimestampedModel):
-    number = models.PositiveIntegerField('номер', unique=True)
-    name = models.CharField(max_length=100)
+class SoftDeleteModel(TimestampedModel):
     is_active = models.BooleanField('работает', default=True)
+    deleted_batch = models.UUIDField(null=True, blank=True, editable=False, db_index=True)
 
     class Meta(TimestampedModel.Meta):
+        abstract = True
+
+
+class Workshop(SoftDeleteModel):
+    number = models.PositiveIntegerField('номер', unique=True)
+    name = models.CharField(max_length=100)
+
+    class Meta(SoftDeleteModel.Meta):
         verbose_name = 'цех'
         verbose_name_plural = 'цеха'
         ordering = ['number']
@@ -24,12 +31,11 @@ class Workshop(TimestampedModel):
         return f'Цех №{self.number} · {self.name}'
 
 
-class Worker(TimestampedModel):
+class Worker(SoftDeleteModel):
     name = models.CharField(max_length=100)
     workshop = models.ForeignKey(Workshop, on_delete=models.PROTECT, related_name='workers')
-    is_active = models.BooleanField('работает', default=True)
 
-    class Meta(TimestampedModel.Meta):
+    class Meta(SoftDeleteModel.Meta):
         verbose_name = 'рабочий'
         verbose_name_plural = 'рабочие'
         ordering = ['name']
@@ -38,7 +44,7 @@ class Worker(TimestampedModel):
         return self.name
 
 
-class Task(TimestampedModel):
+class Task(SoftDeleteModel):
     class Status(models.TextChoices):
         NEW = 'new', 'Новая'
         IN_PROGRESS = 'in_progress', 'В работе'
@@ -52,7 +58,7 @@ class Task(TimestampedModel):
     worker = models.ForeignKey(Worker, on_delete=models.PROTECT, related_name='tasks')
     status = models.CharField('статус', max_length=20, choices=Status.choices, default=Status.NEW)
 
-    class Meta(TimestampedModel.Meta):
+    class Meta(SoftDeleteModel.Meta):
         verbose_name = 'задача'
         verbose_name_plural = 'задачи'
         ordering = ['-created_at']

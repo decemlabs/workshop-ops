@@ -47,3 +47,9 @@ class TaskSerializer(serializers.ModelSerializer):
         if not worker.is_active:
             raise serializers.ValidationError(f'Рабочий «{worker.name}» больше не работает.')
         return worker
+
+
+class BulkIdsSerializer(serializers.Serializer):
+    """Список id для операции над группой записей"""
+
+    ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
