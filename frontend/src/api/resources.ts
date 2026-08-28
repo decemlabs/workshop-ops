@@ -2,6 +2,10 @@
 
 import { api } from './client'
 import type {
+  BulkIdsInput,
+  BulkMoveInput,
+  BulkResult,
+  BulkStatusInput,
   Paginated,
   Task,
   TaskInput,
@@ -23,7 +27,12 @@ export interface Resource<T, TInput, TParams extends object> {
   update: (id: number, payload: Partial<TInput>) => Promise<T>
   /** PUT: полная замена, бэк потребует все обязательные поля. */
   replace: (id: number, payload: TInput) => Promise<T>
+  /** DELETE: мягкое удаление с каскадом, запись остаётся в базе. */
   remove: (id: number) => Promise<null>
+  /** Мягкое удаление группы одной партией — её же поднимает restore. */
+  bulkDelete: (payload: BulkIdsInput) => Promise<BulkResult>
+  /** Восстановление: бэк поднимает всю партию удаления, а не только эти id. */
+  restore: (payload: BulkIdsInput) => Promise<BulkResult>
 }
 
 function createResource<T, TInput, TParams extends object>(
@@ -37,15 +46,25 @@ function createResource<T, TInput, TParams extends object>(
     update: (id, payload) => api.patch<T>(`/${basePath}/${id}/`, payload),
     replace: (id, payload) => api.put<T>(`/${basePath}/${id}/`, payload),
     remove: (id) => api.delete(`/${basePath}/${id}/`),
+    bulkDelete: (payload) => api.post<BulkResult>(`/${basePath}/bulk-delete/`, payload),
+    restore: (payload) => api.post<BulkResult>(`/${basePath}/restore/`, payload),
   }
 }
 
 export const workshopsApi = createResource<Workshop, WorkshopInput, WorkshopListParams>('workshops')
 
-export const workersApi = createResource<Worker, WorkerInput, WorkerListParams>('workers')
+export const workersApi = {
+  ...createResource<Worker, WorkerInput, WorkerListParams>('workers'),
+
+  /** Перевод группы рабочих в другой цех: POST /api/workers/bulk-move/. */
+  bulkMove: (payload: BulkMoveInput) => api.post<BulkResult>('/workers/bulk-move/', payload),
+}
 
 export const tasksApi = {
   ...createResource<Task, TaskInput, TaskListParams>('tasks'),
+
+  /** Смена статуса у группы задач: POST /api/tasks/bulk-status/. */
+  bulkStatus: (payload: BulkStatusInput) => api.post<BulkResult>('/tasks/bulk-status/', payload),
 
   /** Сводка по статусам: GET /api/tasks/summary/ принимает те же фильтры, что и список. */
   summary: (params?: TaskListParams, signal?: AbortSignal) =>

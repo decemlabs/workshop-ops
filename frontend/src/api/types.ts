@@ -1,6 +1,6 @@
 /** Типы ответов REST API (см. backend/src/apps/workshops/serializers.py). */
 
-/** Ответ DRF с пагинацией (PageNumberPagination, PAGE_SIZE = 50). */
+/** Ответ DRF с пагинацией (PageNumberPagination, PAGE_SIZE = 50, max 100). */
 export interface Paginated<T> {
   count: number
   next: string | null
@@ -8,10 +8,23 @@ export interface Paginated<T> {
   results: T[]
 }
 
-export interface Workshop {
+/** Столбик загрузки рабочего на карточке цеха. */
+export interface WorkerLoad {
   id: number
   name: string
+  active_tasks: number
+}
+
+export interface Workshop {
+  id: number
+  number: number
+  name: string
   is_active: boolean
+  /** Счётчики считает бэк (annotate), клиент их не пересчитывает. */
+  workers_count: number
+  active_tasks: number
+  done_tasks: number
+  workers_load: WorkerLoad[]
   created_at: string
   updated_at: string
 }
@@ -22,7 +35,13 @@ export interface Worker {
   workshop: number
   /** read-only, приходит из workshop.name */
   workshop_name: string
+  workshop_number: number
   is_active: boolean
+  tasks_total: number
+  active_tasks: number
+  done_tasks: number
+  /** null, если задач нет */
+  last_task_title: string | null
   created_at: string
   updated_at: string
 }
@@ -39,10 +58,15 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 export interface Task {
   id: number
+  /** read-only, генерируется моделью: ЗН-4801 */
+  code: string
   title: string
   worker: number
   /** read-only, приходит из worker.name */
   worker_name: string
+  worker_workshop: number
+  worker_workshop_name: string
+  worker_workshop_number: number
   status: TaskStatus
   created_at: string
   updated_at: string
@@ -58,11 +82,27 @@ export interface TaskSummary {
   }[]
 }
 
+/** Пользователь: GET /api/auth/me/, POST /api/auth/login/. */
+export interface User {
+  id: number
+  username: string
+  first_name: string
+  last_name: string
+  /** ФИО или логин, если ФИО не заполнено */
+  name: string
+}
+
+export interface LoginInput {
+  username: string
+  password: string
+}
+
 /** Значение фильтра ?is_active= у цехов и рабочих. По умолчанию бэк отдаёт 'true'. */
 export type ActiveFilter = 'true' | 'false' | 'all'
 
 /** Поля, которые принимает бэк при создании/изменении (read-only исключены). */
-export type WorkshopInput = Pick<Workshop, 'name'> & Partial<Pick<Workshop, 'is_active'>>
+export type WorkshopInput = Pick<Workshop, 'number' | 'name'> &
+  Partial<Pick<Workshop, 'is_active'>>
 export type WorkerInput = Pick<Worker, 'name' | 'workshop'> & Partial<Pick<Worker, 'is_active'>>
 export type TaskInput = Pick<Task, 'title' | 'worker'> & Partial<Pick<Task, 'status'>>
 
@@ -71,10 +111,13 @@ export interface ListParams {
   search?: string
   ordering?: string
   page?: number
+  /** page_size_query_param в config/pagination.py, максимум 100. */
+  page_size?: number
 }
 
 export interface WorkshopListParams extends ListParams {
   is_active?: ActiveFilter
+  number?: number
 }
 
 export interface WorkerListParams extends ListParams {
@@ -87,4 +130,23 @@ export interface TaskListParams extends ListParams {
   worker?: number
   /** фильтр по цеху рабочего: ?worker__workshop=1 */
   worker__workshop?: number
+}
+
+/** Тело массовых операций SoftDeleteMixin: bulk-delete и restore. */
+export interface BulkIdsInput {
+  ids: number[]
+}
+
+export interface BulkMoveInput extends BulkIdsInput {
+  workshop: number
+}
+
+export interface BulkStatusInput extends BulkIdsInput {
+  status: TaskStatus
+}
+
+/** batch приходит только у bulk-delete: по нему бэк восстанавливает партию. */
+export interface BulkResult {
+  updated: number
+  batch?: string
 }
