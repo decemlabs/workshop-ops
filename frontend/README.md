@@ -1,83 +1,57 @@
 # Frontend
 
-SPA на React 19 + TypeScript + Vite. Интерфейс перенесён один в один из прототипа
-Claude Design, данные пока мок-овые — подключение к REST API Django
-(`../backend`) следующим шагом.
+SPA на React 19 + TypeScript + Vite. Данные — REST API Django (`../backend`).
+Раскладка проекта и переменные окружения — в корневом README.
 
-## Запуск
+## Команды
+
+Зависимости:
 
 ```bash
 bun install
-bun run dev        # http://localhost:5173, вход master / 1234
 ```
 
-Дев-сервер проксирует `/api`, `/api-auth`, `/admin` и `/static` на Django
-(`http://127.0.0.1:8000`, переопределяется переменной `BACKEND_URL` — см. `.env.example`).
-Благодаря прокси браузер видит фронт и бэк как один origin: не нужны ни CORS,
-ни `CSRF_TRUSTED_ORIGINS`.
+Дев-сервер на http://localhost:5173, вход `master` / `1234`. Запросы `/api`,
+`/api-auth`, `/admin` и `/static` проксируются на Django (`BACKEND_URL`, см. `.env.example`):
 
-Скрипты: `dev`, `build`, `preview`, `typecheck`, `lint`, `test`.
-
-`bun run test` — Vitest в jsdom, бэкенд не нужен: `fetch` замокан целиком.
-
-## Структура
-
-```
-src/
-  design/
-    tokens.css      токены и глобальные стили прототипа — не редактировать
-    style.ts        s() и dc(): разбор инлайнового css и правила :hover/:active;
-                    cssToObj/importantify перенесены из рантайма Claude Design
-  model/
-    types.ts        типы состояния прототипа
-    mock.ts         данные прототипа: 4 цеха, 6 рабочих, 11 задач
-    settings.ts     пропсы канваса (тема, touch, коды задач, подтверждение удаления)
-    useAppModel.ts  порт класса DCLogic: состояние и действия
-    useVals.ts      порт renderVals(): значения, на которые ссылается разметка
-    context.ts      useV() — доступ к значениям из компонентов
-  ui/               по компоненту на каждый sc-if блок шаблона
-  api/, hooks/      слой REST + react-query, для следующего этапа
-  test/             setup Vitest и mockFetch() — подмена fetch по путям
+```bash
+bun run dev
 ```
 
-Алиас `@/` указывает на `src/` (настроен в `vite.config.ts` и `tsconfig.app.json`).
+Тесты — Vitest в jsdom, бэкенд не нужен:
 
-## Маршруты
-
-Прототип переключал экраны состоянием `view`; здесь у каждого свой адрес.
-
-| Путь              | Экран                    |
-| ----------------- | ------------------------ |
-| `/shops`          | цеха карточками          |
-| `/shops/:id`      | цех: рабочие             |
-| `/workers`        | все рабочие              |
-| `/workers/:id`    | рабочий: задачи          |
-| `/tasks`          | все задачи               |
-| `/` и остальное   | редирект на `/shops`     |
-
-## Как устроен перенос
-
-Стили лежат строками ровно в том виде, в каком они стояли в прототипе:
-
-```tsx
-<button {...dc("font:600 12px 'IBM Plex Sans',sans-serif;padding:8px 18px;…", {
-  hover: 'background:var(--accent-dark);border-color:var(--accent-dark)',
-  active: 'transform:translateY(1px)',
-})}>
+```bash
+bun run test
 ```
 
-`s()` разбирает такую строку в объект стилей, `dc()` дополнительно регистрирует
-правило `.scp<N>:hover{…!important}` в общем `<style>` — тем же способом, каким это
-делал рантайм прототипа. Поэтому строки не переписываются в объекты руками
-и переносятся посимвольно.
+Один файл или один тест по имени:
 
-Перенос сверялся с работающим прототипом: деревья сравнивались поузлово
-(тег, текст, 38 вычисленных css-свойств, геометрия) на 22 состояниях — все экраны,
-модалки, выделение, фильтры, сортировки, undo, пагинация, тёмная тема, touch-режим
-и ширина 1000px. Расхождений не было. Эталон и скрипты сверки после этого удалены.
+```bash
+bun run test src/api/client.test.ts
+```
 
-## Что не перенесено
+Типы и линтер:
 
-Ничего из разметки. Из поведения прототипа сохранено всё, включая drag&drop,
-массовые операции, undo и пагинацию по 12. Данные живут в памяти: перезагрузка
-страницы возвращает исходный набор.
+```bash
+bun run typecheck
+```
+
+```bash
+bun run lint
+```
+
+Сборка в `dist/` и просмотр собранного:
+
+```bash
+bun run build
+```
+
+```bash
+bun run preview
+```
+
+Прод-связка целиком (Caddy с этой сборкой + Django + Postgres) на http://localhost:8080:
+
+```bash
+docker compose -f ../compose.prod.yaml up -d --build
+```
