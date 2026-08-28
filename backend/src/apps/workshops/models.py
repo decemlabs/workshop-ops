@@ -19,13 +19,23 @@ class SoftDeleteModel(TimestampedModel):
 
 
 class Workshop(SoftDeleteModel):
-    number = models.PositiveIntegerField('номер', unique=True)
+    number = models.PositiveIntegerField('номер')
     name = models.CharField(max_length=100)
 
     class Meta(SoftDeleteModel.Meta):
         verbose_name = 'цех'
         verbose_name_plural = 'цеха'
         ordering = ['number']
+        constraints = [
+            # Номер занят только действующим цехом: после удаления его можно
+            # выдать заново, иначе пользователь упирается в ошибку про цех,
+            # которого не видит.
+            models.UniqueConstraint(
+                fields=['number'],
+                condition=models.Q(is_active=True),
+                name='unique_active_workshop_number',
+            )
+        ]
 
     def __str__(self) -> str:
         return f'Цех №{self.number} · {self.name}'

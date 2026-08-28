@@ -602,3 +602,35 @@ def test_restore_task_lifts_its_worker(api, shift):
     assert Worker.objects.get(pk=shift['ivanov'].pk).is_active
     # Остальные задачи рабочего остаются в своей партии.
     assert Task.objects.filter(worker=shift['ivanov'], is_active=True).count() == 1
+
+
+def test_number_of_deleted_workshop_can_be_reused(api, shift):
+    api.delete(f'/api/workshops/{shift["hot"].pk}/')
+
+    response = api.post('/api/workshops/', {'number': 10, 'name': 'Заготовительный'})
+
+    assert response.status_code == 201
+
+
+def test_number_of_active_workshop_stays_unique(api, shift):
+    response = api.post('/api/workshops/', {'number': 10, 'name': 'Второй сборочный'})
+
+    assert response.status_code == 400
+    assert 'number' in response.json()
+
+
+def test_workshop_keeps_its_own_number_on_edit(api, shift):
+    response = api.patch(f'/api/workshops/{shift["hot"].pk}/', {'number': 10, 'name': 'Сборка'})
+
+    assert response.status_code == 200
+
+
+def test_restore_reports_number_taken_by_another_workshop(api, shift):
+    api.delete(f'/api/workshops/{shift["hot"].pk}/')
+    api.post('/api/workshops/', {'number': 10, 'name': 'Заготовительный'})
+
+    response = api.post('/api/workshops/restore/', {'ids': [shift['hot'].pk]})
+
+    assert response.status_code == 400
+    assert response.json()['ids'] == 'Номера заняты действующими цехами: [10].'
+    assert not Workshop.objects.get(pk=shift['hot'].pk).is_active

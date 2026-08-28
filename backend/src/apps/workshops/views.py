@@ -100,6 +100,17 @@ class SoftDeleteMixin:
                 Worker.objects.filter(pk__in=worker_ids).values_list('workshop_id', flat=True)
             )
 
+            # Номер цеха мог уйти новому цеху, пока этот лежал удалённым:
+            # частичное ограничение уникальности иначе свалит запрос в 500.
+            clash = sorted(
+                Workshop.objects.filter(pk__in=workshop_ids, is_active=False)
+                .filter(number__in=Workshop.objects.filter(is_active=True).values('number'))
+                .values_list('number', flat=True)
+            )
+
+            if clash:
+                raise ValidationError({'ids': f'Номера заняты действующими цехами: {clash}.'})
+
             # Порядок сверху вниз: цех, рабочие, задачи
             updated = sum(
                 model.objects.filter(pk__in=ids, is_active=False).update(
