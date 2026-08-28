@@ -9,3 +9,5 @@ export const useWorkshop = hooks.useDetail
 export const useCreateWorkshop = hooks.useCreate
 export const useUpdateWorkshop = hooks.useUpdate
 export const useDeleteWorkshop = hooks.useRemove
+export const useBulkDeleteWorkshops = hooks.useBulkDelete
+export const useRestoreWorkshops = hooks.useRestore

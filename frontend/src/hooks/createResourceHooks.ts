@@ -9,7 +9,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import type { Resource } from '@/api/resources'
-import type { Paginated } from '@/api/types'
+import type { BulkIdsInput, Paginated } from '@/api/types'
 
 interface QueryOptions {
   enabled?: boolean
@@ -46,35 +46,65 @@ export function createResourceHooks<T, TInput, TParams extends object>(
     })
   }
 
-  function useCreate() {
+  /**
+   * Инвалидация после мутации — по всему кэшу, а не по своему скоупу.
+   *
+   * Счётчики связаны: новая задача меняет загрузку рабочего и агрегаты цеха,
+   * удаление цеха каскадом гасит рабочих и задачи, restore поднимает всю партию.
+   * Точечная инвалидация оставила бы соседний список с прежними числами.
+   */
+  function useInvalidateAll() {
     const queryClient = useQueryClient()
+    return () => queryClient.invalidateQueries()
+  }
+
+  function useCreate() {
+    const invalidateAll = useInvalidateAll()
 
     return useMutation({
       mutationFn: (payload: TInput) => resource.create(payload),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.all }),
+      onSuccess: invalidateAll,
     })
   }
 
   function useUpdate() {
-    const queryClient = useQueryClient()
+    const invalidateAll = useInvalidateAll()
 
     return useMutation({
       mutationFn: ({ id, payload }: { id: number; payload: Partial<TInput> }) =>
         resource.update(id, payload),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.all }),
+      onSuccess: invalidateAll,
     })
   }
 
   function useRemove() {
-    const queryClient = useQueryClient()
+    const invalidateAll = useInvalidateAll()
 
     return useMutation({
       mutationFn: (id: number) => resource.remove(id),
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.all }),
+      onSuccess: invalidateAll,
     })
   }
 
-  return { keys, useList, useDetail, useCreate, useUpdate, useRemove }
+  function useBulkDelete() {
+    const invalidateAll = useInvalidateAll()
+
+    return useMutation({
+      mutationFn: (payload: BulkIdsInput) => resource.bulkDelete(payload),
+      onSuccess: invalidateAll,
+    })
+  }
+
+  function useRestore() {
+    const invalidateAll = useInvalidateAll()
+
+    return useMutation({
+      mutationFn: (payload: BulkIdsInput) => resource.restore(payload),
+      onSuccess: invalidateAll,
+    })
+  }
+
+  return { keys, useList, useDetail, useCreate, useUpdate, useRemove, useBulkDelete, useRestore }
 }
 
 /** Пустой ответ списка — удобно как значение по умолчанию, пока данные грузятся. */

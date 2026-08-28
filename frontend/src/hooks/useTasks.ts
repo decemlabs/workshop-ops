@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { tasksApi } from '@/api/resources'
-import type { TaskListParams } from '@/api/types'
+import type { BulkStatusInput, TaskListParams } from '@/api/types'
 import { createResourceHooks } from './createResourceHooks'
 
 const hooks = createResourceHooks(tasksApi, 'tasks')
@@ -16,6 +16,18 @@ export const useTask = hooks.useDetail
 export const useCreateTask = hooks.useCreate
 export const useUpdateTask = hooks.useUpdate
 export const useDeleteTask = hooks.useRemove
+export const useBulkDeleteTasks = hooks.useBulkDelete
+export const useRestoreTasks = hooks.useRestore
+
+/** Смена статуса у выбранных задач — одним запросом. */
+export function useBulkTaskStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (payload: BulkStatusInput) => tasksApi.bulkStatus(payload),
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+}
 
 /** Счётчики по статусам. Ключ лежит внутри scope 'tasks', поэтому мутации задач его тоже сбрасывают. */
 export function useTaskSummary(params?: TaskListParams) {
