@@ -49,12 +49,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Достаёт человекочитаемое сообщение из тела ответа DRF. */
+/**
+ * Достаёт человекочитаемое сообщение из тела ответа DRF.
+ *
+ * Строковое тело в сообщение не берём: DRF отвечает словарём или 204, а строкой приходит
+ * чужая HTML-страница — трейсбек Django при DEBUG или ответ прокси. Сырое тело
+ * остаётся в ApiError.data.
+ */
 function extractMessage(status: number, data: unknown): string {
-  if (typeof data === 'string' && data) {
-    return data
-  }
-
   if (isRecord(data)) {
     const detail = data.detail
     if (typeof detail === 'string') {
