@@ -34,7 +34,7 @@ export function FormModal() {
               <div style={s("font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:var(--muted);margin-bottom:6px")}>ЦЕХ</div>
               <select value={v.fShop} onChange={v.onShop} style={s("width:100%;padding:9px 11px;border:1px solid var(--ink);background:var(--field);font:400 13px 'IBM Plex Sans',sans-serif;color:var(--ink)")}>
                 {v.shopOptions.map((o, i) => (
-                  <option key={i} value={o.value}>{o.label}</option>
+                  <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
                 ))}
               </select>
             </div>
@@ -44,7 +44,7 @@ export function FormModal() {
               <div style={s("font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:var(--muted);margin-bottom:6px")}>РАБОЧИЙ</div>
               <select value={v.fWorker} onChange={v.onWorker} style={s("width:100%;padding:9px 11px;border:1px solid var(--ink);background:var(--field);font:400 13px 'IBM Plex Sans',sans-serif;color:var(--ink)")}>
                 {v.workerOptions.map((o, i) => (
-                  <option key={i} value={o.value}>{o.label}</option>
+                  <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
                 ))}
               </select>
             </div>
@@ -54,7 +54,7 @@ export function FormModal() {
               <div style={s("font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:var(--muted);margin-bottom:6px")}>СТАТУС</div>
               <select value={v.fStatus} onChange={v.onStatus} style={s("width:100%;padding:9px 11px;border:1px solid var(--ink);background:var(--field);font:400 13px 'IBM Plex Sans',sans-serif;color:var(--ink)")}>
                 {v.statusOptions.map((o, i) => (
-                  <option key={i} value={o.value}>{o.label}</option>
+                  <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
                 ))}
               </select>
             </div>

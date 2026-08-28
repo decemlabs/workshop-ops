@@ -19,17 +19,17 @@ export function TasksView() {
         <input value={v.q} onChange={v.onQ} placeholder="Поиск по задаче, номеру или рабочему" style={s("flex:1 1 200px;min-width:160px;max-width:300px;height:36px;font:400 13px/1.2 'IBM Plex Sans',sans-serif;padding:0 11px;border:1px solid rgba(var(--ink-rgb),.4);background:var(--field);color:var(--ink)")} />
         <select value={v.fShopFilter} onChange={v.onShopFilter} style={s("width:170px;min-width:120px;flex:0 1 170px;height:36px;font:400 13px/1.2 'IBM Plex Sans',sans-serif;padding:0 11px;border:1px solid rgba(var(--ink-rgb),.4);background:var(--field);color:var(--ink)")}>
           {v.shopFilterOptions.map((o, i) => (
-            <option key={i} value={o.value}>{o.label}</option>
+            <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
           ))}
         </select>
         <select value={v.fWorkerFilter} onChange={v.onWorkerFilter} style={s("width:170px;min-width:120px;flex:0 1 170px;height:36px;font:400 13px/1.2 'IBM Plex Sans',sans-serif;padding:0 11px;border:1px solid rgba(var(--ink-rgb),.4);background:var(--field);color:var(--ink)")}>
           {v.workerFilterOptions.map((o, i) => (
-            <option key={i} value={o.value}>{o.label}</option>
+            <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
           ))}
         </select>
         <select value={v.fStatusFilter} onChange={v.onStatusFilter} style={s("width:170px;min-width:120px;flex:0 1 170px;height:36px;font:400 13px/1.2 'IBM Plex Sans',sans-serif;padding:0 11px;border:1px solid rgba(var(--ink-rgb),.4);background:var(--field);color:var(--ink)")}>
           {v.statusFilterOptions.map((o, i) => (
-            <option key={i} value={o.value}>{o.label}</option>
+            <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
           ))}
         </select>
         {v.filtersOn && (
@@ -42,7 +42,7 @@ export function TasksView() {
           <div style={s("font:600 12.5px 'IBM Plex Sans',sans-serif")}>Выбрано: {v.selTCount}</div>
           <select onChange={v.onBulkStatus} aria-label="Сменить статус выбранных" style={s("font:400 12.5px 'IBM Plex Sans',sans-serif;padding:7px 10px;border:1px solid rgba(var(--paper-rgb),.4);background:transparent;color:var(--paper)")}>
             {v.bulkStatusOptions.map((o, i) => (
-              <option key={i} value={o.value} style={s('color:#161616')}>{o.label}</option>
+              <option key={i} value={o.value} disabled={o.disabled} style={s('color:#161616')}>{o.label}</option>
             ))}
           </select>
           <button onClick={v.bulkDeleteTasks} {...dc("font:600 12.5px 'IBM Plex Sans',sans-serif;padding:7px 13px;border:1px solid var(--danger);background:transparent;color:var(--danger);cursor:pointer;transition:background .12s,color .12s", { hover: 'background:var(--danger);color:var(--on-accent)' })}>Удалить выбранные</button>
