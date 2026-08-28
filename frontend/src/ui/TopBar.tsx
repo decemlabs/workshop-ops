@@ -8,7 +8,7 @@ export function TopBar() {
   return (
     <div style={s('display:grid;grid-template-columns:210px minmax(0,1fr) auto 96px;height:44px;background:var(--ink);color:var(--paper)')}>
       <div style={s("display:flex;align-items:center;padding:0 16px;border-right:1px solid rgba(var(--paper-rgb),.18);font:700 15px/1 'IBM Plex Sans Condensed',sans-serif;letter-spacing:.07em")}>MES · ПРОИЗВОДСТВО</div>
-      <div style={s("display:flex;align-items:center;gap:10px;padding:0 16px;border-right:1px solid rgba(var(--paper-rgb),.18);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 12.5px/1 'IBM Plex Sans',sans-serif")}>Кузнецов А. В.<span style={s("font:400 11.5px/1 'IBM Plex Mono',monospace;color:rgba(var(--paper-rgb),.5)")}>мастер цеха</span></div>
+      <div style={s("display:flex;align-items:center;gap:10px;padding:0 16px;border-right:1px solid rgba(var(--paper-rgb),.18);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 12.5px/1 'IBM Plex Sans',sans-serif")}>{v.userName}</div>
       <div style={s('display:flex;align-items:center;gap:14px;padding:0 16px;border-right:1px solid rgba(var(--paper-rgb),.18);white-space:nowrap')}>
         <div style={s("display:flex;align-items:center;gap:7px;font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(var(--paper-rgb),.5)")}>{v.shiftDate}</div>
         <div style={s('display:flex;width:96px;height:7px;background:rgba(var(--paper-rgb),.16)')}>

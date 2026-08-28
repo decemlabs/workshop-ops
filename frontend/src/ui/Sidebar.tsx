@@ -34,7 +34,7 @@ export function Sidebar() {
           <div style={s('display:flex;align-items:center;gap:8px')}><span style={s('width:8px;height:8px;background:var(--ok-soft);display:inline-block')}></span>Выполнено<span style={s("margin-left:auto;font-family:'IBM Plex Mono',monospace")}>{v.countDone}</span></div>
         </div>
       </div>
-      <div style={s("margin-top:auto;font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:rgba(var(--paper-rgb),.45)")}>Смена 1 · 27.08.2026<br />Мастер Кузнецов А. В.</div>
+      <div style={s("margin-top:auto;font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:rgba(var(--paper-rgb),.45)")}>Смена 1 · 27.08.2026<br />{v.userName}</div>
     </div>
   )
 }
