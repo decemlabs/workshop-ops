@@ -78,8 +78,6 @@ def credentials() -> tuple[str, str]:
                 '--noinput',
                 '--username',
                 USER,
-                '--email',
-                '',
             ],
             capture_output=True,  # «username is already taken» — ожидаемо на втором прогоне
             check=False,
