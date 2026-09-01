@@ -217,16 +217,21 @@ export function useVals(model: AppModel) {
   }
 
   const nf = new Intl.NumberFormat('ru-RU')
+  // Одна дата на оба места: иначе на переходе через полночь они разойдутся.
+  const now = new Date()
   const shiftDate = new Intl.DateTimeFormat('ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(new Date())
+  }).format(now)
+  /** Та же дата компактно, для подвала: 01.09.2026. */
+  const shiftDateShort = new Intl.DateTimeFormat('ru-RU').format(now)
 
   return {
     theme: SETTINGS.darkTheme ? 'dark' : 'light',
     touch: SETTINGS.touchMode ? '1' : '0',
     shiftDate: shiftDate,
+    shiftDateShort: shiftDateShort,
     userName: data.userName,
     loading: data.loading,
     notLoading: !data.loading,

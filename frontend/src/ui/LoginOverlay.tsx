@@ -9,7 +9,7 @@ export function LoginOverlay() {
   return (
     <div style={s('position:fixed;inset:0;z-index:120;background:var(--bg);display:flex;flex-direction:column')}>
       <div style={s('display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--ink);color:var(--paper)')}>
-        <div style={s("font:700 16px/1 'IBM Plex Sans Condensed',sans-serif;letter-spacing:.06em")}>MES · ПРОИЗВОДСТВО</div>
+        <div style={s("font:600 16px/1 'IBM Plex Mono',monospace;letter-spacing:.06em")}>MES · ПРОИЗВОДСТВО</div>
       </div>
       <div style={s('flex:1;display:flex;align-items:center;justify-content:center;padding:44px')}>
         <form onSubmit={v.submitLogin} style={s('width:100%;max-width:330px;display:flex;flex-direction:column;gap:16px')}>
