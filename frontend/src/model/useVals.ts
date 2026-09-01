@@ -29,6 +29,8 @@ export interface TaskRow {
   status: Status
   color: string
   worker: string
+  /** Работа в цехе, которую некому делать: помечаем её в списке. */
+  unassigned: boolean
   shop: string
   edit: () => void
   del: () => void
@@ -79,6 +81,12 @@ export interface DropShop {
 const shopLabel = (number?: number, name?: string) =>
   number == null ? '—' : `Цех №${number} · ${name}`
 
+/** Задача лежит в цехе и ждёт, кому её отдадут. */
+const NO_WORKER_LABEL = '— не назначен —'
+
+/** То же в строке списка: там подпись обведена рамкой, тире ни к чему. */
+const NO_WORKER_SHORT = 'не назначен'
+
 export function useVals(model: AppModel) {
   const {
     st,
@@ -110,6 +118,16 @@ export function useVals(model: AppModel) {
   const cur = data.workshop
   const curW = data.worker
 
+  /**
+   * Исполнителя может не быть. У выполненной ничьей показываем, кто её сделал:
+   * у незакрытой прежний исполнитель ни при чём — её ещё делать и делать.
+   */
+  const workerLabel = (t: ApiTask): string =>
+    t.worker_name ??
+    (t.status === 'done' && t.former_worker_name
+      ? 'выполнил ' + t.former_worker_name
+      : NO_WORKER_SHORT)
+
   const taskRow = (t: ApiTask): TaskRow => {
     const status = STATUS_LABEL[t.status]
     return {
@@ -117,10 +135,19 @@ export function useVals(model: AppModel) {
       code: showCodes ? t.code : '',
       status,
       color: COLORS[status],
-      worker: t.worker_name,
-      shop: shopLabel(t.worker_workshop_number, t.worker_workshop_name),
+      worker: workerLabel(t),
+      // Выполненную не метим: её никому и не нужно назначать.
+      unassigned: t.worker === null && t.status !== 'done',
+      shop: shopLabel(t.workshop_number, t.workshop_name),
       edit: () =>
-        openModal({ kind: 'task', id: t.id, name: t.title, workerId: t.worker, status }),
+        openModal({
+          kind: 'task',
+          id: t.id,
+          name: t.title,
+          shopId: t.workshop,
+          workerId: t.worker ?? '',
+          status,
+        }),
       del: () => askDelete({ kind: 'task', id: t.id, label: t.title }),
       sel: st.selT.indexOf(t.id) !== -1,
       toggle: () => toggleSel('t', t.id),
@@ -363,9 +390,21 @@ export function useVals(model: AppModel) {
     editWorker: () =>
       curW && openModal({ kind: 'worker', id: curW.id, name: curW.name, shopId: curW.workshop }),
     addTask: () =>
-      openModal({ kind: 'task', name: '', workerId: route.workerId, status: defStatus }),
+      openModal({
+        kind: 'task',
+        name: '',
+        shopId: curW?.workshop,
+        workerId: route.workerId,
+        status: defStatus,
+      }),
     addTaskAny: () =>
-      openModal({ kind: 'task', name: '', workerId: data.workersDict[0]?.id, status: defStatus }),
+      openModal({
+        kind: 'task',
+        name: '',
+        shopId: data.workshops[0]?.id,
+        workerId: '',
+        status: defStatus,
+      }),
 
     q: st.q,
     onQ: (e: ChangeEvent<HTMLInputElement>) => setState({ q: e.target.value, pageW: 1, pageT: 1 }),
@@ -455,21 +494,31 @@ export function useVals(model: AppModel) {
     showNum: !!m && m.kind === 'shop',
     fNum: m ? String(m.num == null ? '' : m.num) : '',
     onNum: field('num' as keyof Modal),
-    showShop: !!m && m.kind === 'worker',
+    showShop: !!m && (m.kind === 'worker' || m.kind === 'task'),
     fShop: m && m.shopId != null ? String(m.shopId) : '',
-    onShop: field('shopId' as keyof Modal),
+    onShop: (e: ChangeEvent<HTMLSelectElement>) =>
+      setState({
+        modal: {
+          ...(m as Modal),
+          shopId: e.target.value,
+          // Прежний рабочий в новом цехе не найдётся: select молча показал бы
+          // первого из списка, и сохранился бы он же.
+          ...(m?.kind === 'task' ? { workerId: '' } : {}),
+          err: '',
+        },
+      }),
     shopOptions: data.workshops
       .map((s): Option => ({ value: String(s.id), label: 'Цех №' + s.number + ' — ' + s.name }))
       .concat(hintOption(data.workshops.length, data.shopsCount)),
     showWorkerSelect: !!m && m.kind === 'task',
     fWorker: m && m.workerId != null ? String(m.workerId) : '',
     onWorker: field('workerId' as keyof Modal),
-    workerOptions: data.workersDict
-      .map(
-        (w): Option => ({
-          value: String(w.id),
-          label: w.name + ' · ' + shopLabel(w.workshop_number, w.workshop_name),
-        }),
+    // Назначить можно только рабочего цеха задачи — остальных в списке нет.
+    workerOptions: ([{ value: '', label: NO_WORKER_LABEL }] as Option[])
+      .concat(
+        data.workersDict
+          .filter((w) => String(w.workshop) === String(m?.shopId ?? ''))
+          .map((w): Option => ({ value: String(w.id), label: w.name })),
       )
       .concat(hintOption(data.workersDict.length, data.workersCount)),
     showStatus: !!m && m.kind === 'task',
@@ -484,7 +533,9 @@ export function useVals(model: AppModel) {
       ? st.confirm.kind === 'shop'
         ? 'Удалить «' + st.confirm.label + '»? Рабочие цеха и их задачи будут удалены.'
         : st.confirm.kind === 'worker'
-          ? 'Удалить рабочего «' + st.confirm.label + '» вместе с его задачами?'
+          ? 'Удалить рабочего «' +
+            st.confirm.label +
+            '»? Задачи останутся в цехе без исполнителя.'
           : 'Удалить задачу «' + st.confirm.label + '»?'
       : '',
     closeConfirm: () => setState({ confirm: null }),

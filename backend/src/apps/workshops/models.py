@@ -65,7 +65,22 @@ class Task(SoftDeleteModel):
 
     code = models.CharField('код', max_length=20, unique=True, blank=True)
     title = models.CharField(max_length=100)
-    worker = models.ForeignKey(Worker, on_delete=models.PROTECT, related_name='tasks')
+    workshop = models.ForeignKey(
+        Workshop, on_delete=models.PROTECT, related_name='tasks', verbose_name='цех'
+    )
+    worker = models.ForeignKey(
+        Worker, on_delete=models.PROTECT, related_name='tasks', null=True, blank=True
+    )
+    # Кому вернуть задачу, если рабочий вернётся в её цех, и кто её выполнил,
+    # если она осталась ничьей.
+    former_worker = models.ForeignKey(
+        Worker,
+        on_delete=models.PROTECT,
+        related_name='released_tasks',
+        null=True,
+        blank=True,
+        verbose_name='прежний исполнитель',
+    )
     status = models.CharField('статус', max_length=20, choices=Status.choices, default=Status.NEW)
 
     class Meta(SoftDeleteModel.Meta):
@@ -86,9 +101,9 @@ class Task(SoftDeleteModel):
             super().save(update_fields=['code'])
 
     def clean(self) -> None:
-        """Не даёт завести задачу на выведенного из штата рабочего.
+        """Проверяет исполнителя: он в штате и из цеха задачи.
 
-        Проверка только при создании (pk is None): иначе перестанут
+        Проверка на увольнение только при создании (pk is None): иначе перестанут
         сохраняться старые задачи уволенного, которые править разрешено.
         Не закрыто переназначение существующей задачи на уволенного через
         админку — для этого пришлось бы поднимать прежнее значение из БД
@@ -98,5 +113,13 @@ class Task(SoftDeleteModel):
         в шелле её не вызывает — там ограничений нет намеренно, миграциям
         и фикстурам бизнес-правила мешают.
         """
+        if self.worker_id is None:
+            return  # задача лежит в цехе без исполнителя — это нормально
+
         if self.pk is None and not self.worker.is_active:
             raise ValidationError({'worker': f'Рабочий «{self.worker.name}» больше не работает.'})
+
+        # workshop_id пуст, когда full_clean() уже отбраковал обязательное поле:
+        # своя ошибка про «другой цех» тут только запутает.
+        if self.workshop_id and self.worker.workshop_id != self.workshop_id:
+            raise ValidationError({'worker': f'Рабочий «{self.worker.name}» из другого цеха.'})

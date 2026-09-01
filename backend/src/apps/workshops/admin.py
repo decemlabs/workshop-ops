@@ -27,9 +27,9 @@ class WorkerAdmin(admin.ModelAdmin):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ['code', 'title', 'worker', 'status', 'created_at']
+    list_display = ['code', 'title', 'workshop', 'worker', 'status', 'created_at']
 
-    list_filter = ['status', 'worker__workshop']
+    list_filter = ['status', 'workshop']
     search_fields = ['title', 'code']
-    autocomplete_fields = ['worker']
+    autocomplete_fields = ['workshop', 'worker', 'former_worker']
     readonly_fields = ['code', 'created_at', 'updated_at']

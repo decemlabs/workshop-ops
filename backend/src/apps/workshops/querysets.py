@@ -51,13 +51,15 @@ def workers_for_card(limit: int = WORKSHOP_CARD_WORKERS) -> QuerySet:
 
 
 def _workshop_task_count(condition: Q) -> Coalesce:
-    """Скалярный подзапрос со счётчиком задач цеха"""
+    """Скалярный подзапрос со счётчиком задач цеха.
+
+    Считаем по цеху самой задачи, а не по цеху её рабочего: работа принадлежит
+    цеху и остаётся в загрузке, даже когда её некому делать.
+    """
     counted = (
-        Task.objects.filter(
-            Q(worker__workshop=OuterRef('pk'), worker__is_active=True, is_active=True) & condition
-        )
+        Task.objects.filter(Q(workshop=OuterRef('pk'), is_active=True) & condition)
         .order_by()
-        .values('worker__workshop')
+        .values('workshop')
         .annotate(counted=Count('id'))
         .values('counted')
     )

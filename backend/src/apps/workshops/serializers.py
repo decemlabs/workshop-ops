@@ -65,11 +65,14 @@ class WorkerSerializer(serializers.ModelSerializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    worker_name = serializers.CharField(source='worker.name', read_only=True)
-    worker_workshop = serializers.IntegerField(source='worker.workshop_id', read_only=True)
-    worker_workshop_name = serializers.CharField(source='worker.workshop.name', read_only=True)
-    worker_workshop_number = serializers.IntegerField(
-        source='worker.workshop.number', read_only=True
+    # queryset ограничен активными: иначе задачу заводят в удалённый цех.
+    workshop = serializers.PrimaryKeyRelatedField(queryset=Workshop.objects.filter(is_active=True))
+    workshop_name = serializers.CharField(source='workshop.name', read_only=True)
+    workshop_number = serializers.IntegerField(source='workshop.number', read_only=True)
+    # Исполнителя может не быть: задача лежит в цехе и ждёт, кому её отдадут.
+    worker_name = serializers.CharField(source='worker.name', read_only=True, allow_null=True)
+    former_worker_name = serializers.CharField(
+        source='former_worker.name', read_only=True, allow_null=True
     )
 
     class Meta:
@@ -78,21 +81,52 @@ class TaskSerializer(serializers.ModelSerializer):
             'id',
             'code',
             'title',
+            'workshop',
+            'workshop_name',
+            'workshop_number',
             'worker',
             'worker_name',
-            'worker_workshop',
-            'worker_workshop_name',
-            'worker_workshop_number',
+            'former_worker_name',
             'status',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['code']
 
-    def validate_worker(self, worker: Worker) -> Worker:
-        if not worker.is_active:
-            raise serializers.ValidationError(f'Рабочий «{worker.name}» больше не работает.')
-        return worker
+    def validate(self, attrs: dict) -> dict:
+        """Исполнитель задачи — в штате и из её же цеха.
+
+        Проверяем, только когда пишут цех или рабочего: PATCH одного статуса
+        у старой задачи уволенного должен проходить, как и раньше.
+        """
+        if 'worker' not in attrs and 'workshop' not in attrs:
+            return attrs
+
+        # На PATCH приходит одно поле из двух — второе берём у самой задачи.
+        worker = attrs.get('worker', getattr(self.instance, 'worker', None))
+        workshop = attrs.get('workshop', getattr(self.instance, 'workshop', None))
+
+        if worker is None:
+            return attrs
+
+        if 'worker' in attrs and not worker.is_active:
+            raise serializers.ValidationError(
+                {'worker': f'Рабочий «{worker.name}» больше не работает.'}
+            )
+        if worker.workshop_id != workshop.pk:
+            raise serializers.ValidationError(
+                {'worker': f'Рабочий «{worker.name}» не из цеха «{workshop.name}».'}
+            )
+
+        return attrs
+
+    def update(self, instance: Task, validated_data: dict) -> Task:
+        # Смена исполнителя руками работает как перевод: помним, у кого задача была,
+        # иначе открепление мышкой оставит её ждать прежнего владельца.
+        if 'worker' in validated_data and validated_data['worker'] != instance.worker:
+            validated_data['former_worker'] = instance.worker
+
+        return super().update(instance, validated_data)
 
 
 class BulkIdsSerializer(serializers.Serializer):

@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Prefetch, QuerySet, When
+from django.db.models import Case, Count, F, IntegerField, Prefetch, QuerySet, When
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -17,6 +17,32 @@ from .serializers import (
     WorkerSerializer,
     WorkshopSerializer,
 )
+
+
+def release_tasks(workers, workshop=None) -> int:
+    """Открепляет задачи ушедших: цех у задачи свой, меняется только исполнитель.
+
+    former_worker помнит, кому вернуть задачу, поэтому и обратный перевод, и
+    восстановление удалённого рабочего откатывают открепление сами.
+    """
+    tasks = Task.objects.filter(worker__in=workers)
+
+    if workshop is not None:
+        # К задачам целевого цеха рабочий приходит, а не уходит от них.
+        tasks = tasks.exclude(workshop=workshop)
+
+    # Постгрес берёт правую часть SET из старой строки, поэтому worker_id
+    # успевает уехать в former_worker_id до обнуления.
+    return tasks.update(former_worker=F('worker'), worker=None)
+
+
+def return_tasks(workers) -> int:
+    """Возвращает задачи прежнему исполнителю, когда он снова в их цехе и они ничьи."""
+    return Task.objects.filter(
+        former_worker__in=workers,
+        worker__isnull=True,
+        workshop=F('former_worker__workshop'),
+    ).update(worker=F('former_worker'), former_worker=None)
 
 
 class ActiveFilterMixin:
@@ -93,8 +119,11 @@ class SoftDeleteMixin:
                 Workshop.objects.filter(deleted_batch__in=batches).values_list('pk', flat=True)
             )
 
-            worker_ids |= set(
-                Task.objects.filter(pk__in=task_ids).values_list('worker_id', flat=True)
+            # Цех задачи, а не её рабочий: владеет задачей цех, а исполнитель —
+            # сменная роль. Поднимать за задачей людей значит воскрешать уволенных,
+            # а задача без исполнителя вернётся в свой цех и подождёт нового.
+            workshop_ids |= set(
+                Task.objects.filter(pk__in=task_ids).values_list('workshop_id', flat=True)
             )
             workshop_ids |= set(
                 Worker.objects.filter(pk__in=worker_ids).values_list('workshop_id', flat=True)
@@ -118,6 +147,9 @@ class SoftDeleteMixin:
                 )
                 for model, ids in ((Workshop, workshop_ids), (Worker, worker_ids), (Task, task_ids))
             )
+
+            # Рабочий снова в штате — забирает назад то, что открепили при удалении.
+            return_tasks(Worker.objects.filter(pk__in=worker_ids))
 
         return Response({'updated': updated})
 
@@ -144,15 +176,12 @@ class WorkshopViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet)
         )
 
     def cascade(self, queryset, batch):
-        worker_ids = list(
-            Worker.objects.filter(workshop__in=queryset, is_active=True).values_list(
-                'pk', flat=True
-            )
-        )
-        updated = Task.objects.filter(worker_id__in=worker_ids, is_active=True).update(
+        # Задачи ищем по их собственному цеху: через рабочих терялись бы ничьи.
+        # Открепления тут нет намеренно — цех гасится одной партией и одной же поднимается.
+        updated = Task.objects.filter(workshop__in=queryset, is_active=True).update(
             is_active=False, deleted_batch=batch
         )
-        return updated + Worker.objects.filter(pk__in=worker_ids).update(
+        return updated + Worker.objects.filter(workshop__in=queryset, is_active=True).update(
             is_active=False, deleted_batch=batch
         )
 
@@ -177,27 +206,46 @@ class WorkerViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
         return with_worker_stats(super().get_queryset())
 
     def cascade(self, queryset, batch):
-        return Task.objects.filter(worker__in=queryset, is_active=True).update(
-            is_active=False, deleted_batch=batch
-        )
+        # Работа остаётся в цехе, у неё просто нет исполнителя.
+        release_tasks(queryset)
+        return 0  # задачи не удалены и в счётчик удалённых не идут
+
+    def perform_update(self, serializer):
+        """Правка рабочего — это ещё и перевод: цех у него меняется через форму."""
+        workshop = serializer.validated_data.get('workshop')
+        worker = serializer.instance
+
+        if not workshop or workshop.pk == worker.workshop_id:
+            return serializer.save()
+
+        # Тот же перевод, что и bulk-move, только по одному рабочему.
+        with transaction.atomic():
+            release_tasks([worker], workshop)
+            serializer.save()
+            return_tasks([worker])
 
     @action(detail=False, methods=['post'], url_path='bulk-move')
     def bulk_move(self, request):
         serializer = BulkMoveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        workers = self.selection(serializer.validated_data['ids'])
+        workshop = serializer.validated_data['workshop']
+
         with transaction.atomic():
-            updated = self.selection(serializer.validated_data['ids']).update(
-                workshop=serializer.validated_data['workshop']
-            )
+            release_tasks(workers, workshop)
+            updated = workers.update(workshop=workshop)
+            # Что рабочий оставлял в этом цехе раньше — снова его: так откатывается
+            # обратный перевод по кнопке «Вернуть».
+            return_tasks(workers)
 
         return Response({'updated': updated})
 
 
 class TaskViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
-    queryset = Task.objects.select_related('worker__workshop')
+    queryset = Task.objects.select_related('workshop', 'worker', 'former_worker')
     serializer_class = TaskSerializer
-    filterset_fields = ['status', 'worker', 'worker__workshop']
+    filterset_fields = ['status', 'worker', 'workshop']
     search_fields = ['title', 'worker__name', 'code']
     ordering_fields = [
         'created_at',
@@ -206,8 +254,8 @@ class TaskViewSet(SoftDeleteMixin, ActiveFilterMixin, viewsets.ModelViewSet):
         'code',
         'status_order',
         'worker__name',
-        'worker__workshop__name',
-        'worker__workshop__number',
+        'workshop__name',
+        'workshop__number',
     ]
 
     def get_queryset(self):

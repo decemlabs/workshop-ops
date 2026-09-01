@@ -61,12 +61,17 @@ export interface Task {
   /** read-only, генерируется моделью: ЗН-4801 */
   code: string
   title: string
-  worker: number
+  /** задача принадлежит цеху, а не рабочему */
+  workshop: number
+  /** read-only, приходит из workshop.name */
+  workshop_name: string
+  workshop_number: number
+  /** null, если задача лежит в цехе без исполнителя */
+  worker: number | null
   /** read-only, приходит из worker.name */
-  worker_name: string
-  worker_workshop: number
-  worker_workshop_name: string
-  worker_workshop_number: number
+  worker_name: string | null
+  /** прежний исполнитель: кто выполнил задачу, оставшуюся ничьей */
+  former_worker_name: string | null
   status: TaskStatus
   created_at: string
   updated_at: string
@@ -104,7 +109,8 @@ export type ActiveFilter = 'true' | 'false' | 'all'
 export type WorkshopInput = Pick<Workshop, 'number' | 'name'> &
   Partial<Pick<Workshop, 'is_active'>>
 export type WorkerInput = Pick<Worker, 'name' | 'workshop'> & Partial<Pick<Worker, 'is_active'>>
-export type TaskInput = Pick<Task, 'title' | 'worker'> & Partial<Pick<Task, 'status'>>
+export type TaskInput = Pick<Task, 'title' | 'workshop'> &
+  Partial<Pick<Task, 'worker' | 'status'>>
 
 /** Общие query-параметры списков: поиск, сортировка, страница. */
 export interface ListParams {
@@ -128,8 +134,8 @@ export interface WorkerListParams extends ListParams {
 export interface TaskListParams extends ListParams {
   status?: TaskStatus
   worker?: number
-  /** фильтр по цеху рабочего: ?worker__workshop=1 */
-  worker__workshop?: number
+  /** фильтр по цеху задачи: ?workshop=1 */
+  workshop?: number
 }
 
 /** Тело массовых операций SoftDeleteMixin: bulk-delete и restore. */

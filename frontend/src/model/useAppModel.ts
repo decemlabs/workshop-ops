@@ -77,7 +77,7 @@ const WORKER_ORDERING: Record<State['sortW'], string> = {
 const TASK_ORDERING: Record<State['sortT'], string> = {
   title: 'title',
   worker: 'worker__name',
-  shop: 'worker__workshop__number',
+  shop: 'workshop__number',
   status: 'status_order',
 }
 
@@ -190,7 +190,7 @@ export function useAppModel() {
     search: st.q || undefined,
     status: st.fStatus ? STATUS_CODE[st.fStatus as Status] : undefined,
     worker: num(st.fWorker),
-    worker__workshop: num(st.fShop),
+    workshop: num(st.fShop),
     ordering: ordering(TASK_ORDERING[st.sortT], st.dirT),
     page: st.pageT,
     page_size: PAGE,
@@ -447,7 +447,9 @@ export function useAppModel() {
         } else {
           const payload = {
             title: name,
-            worker: Number(m.workerId),
+            workshop: Number(m.shopId),
+            // Задача может лежать в цехе без исполнителя — его назначат потом.
+            worker: m.workerId ? Number(m.workerId) : null,
             status: STATUS_CODE[(m.status as Status) || STATUSES[0]],
           }
           await (m.id

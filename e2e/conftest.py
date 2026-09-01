@@ -153,6 +153,8 @@ class Data:
             'tasks',
             {
                 'title': title or f'Задача {uuid4().hex[:6]}',
+                # Цех у задачи свой: берём его у рабочего, чтобы вызовы не менялись.
+                'workshop': worker['workshop'],
                 'worker': worker['id'],
                 'status': status,
             },
